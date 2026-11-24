@@ -54,7 +54,7 @@
     }
     .modal-box h2 { font-size: 1.15rem; margin-bottom: 10px; }
     .modal-box p { font-size: 0.85rem; color: var(--text-sub); line-height: 1.5; margin-bottom: 16px; }
-    .modal-box input, .modal-box textarea {
+    .modal-box input, .modal-box textarea, .modal-box select {
       width: 100%;
       padding: 11px 14px;
       border-radius: 10px;
@@ -67,7 +67,7 @@
       font-family: inherit;
     }
     .modal-box textarea { resize: none; height: 74px; }
-    .modal-box input:focus, .modal-box textarea:focus { border-color: var(--accent); }
+    .modal-box input:focus, .modal-box textarea:focus, .modal-box select:focus { border-color: var(--accent); }
     .tag-chips { display: flex; gap: 6px; margin-bottom: 12px; }
     .tag-chip {
       flex: 1;
@@ -244,9 +244,7 @@
       overflow: hidden;
       transition: border-color 0.15s;
     }
-    .cal-day.other-month {
-      opacity: 0.32;
-    }
+    .cal-day.other-month { opacity: 0.32; }
     .cal-day.today {
       border-color: var(--accent);
       background: rgba(59, 130, 246, 0.12);
@@ -292,32 +290,44 @@
       margin-bottom: 2px;
     }
 
-    /* 업무 모드 전용 하단 예산 현황 플로팅 버튼 */
-    .budget-fab {
+    /* 업무 모드 전용 하단 플로팅 버튼 그룹 (예산 현황 + 연구비 카드) */
+    .work-fab-bar {
       position: fixed;
       bottom: 22px;
       left: 50%;
       transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      z-index: 500;
+    }
+    .work-fab-bar.hidden {
+      display: none;
+    }
+    .work-fab {
       background: var(--green);
       color: #000000;
       border: none;
       border-radius: 999px;
-      padding: 11px 24px;
-      font-size: 0.92rem;
+      padding: 11px 20px;
+      font-size: 0.9rem;
       font-weight: 700;
       cursor: pointer;
       box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35);
-      z-index: 500;
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      transition: transform 0.15s, box-shadow 0.15s;
+      gap: 7px;
+      white-space: nowrap;
+      transition: transform 0.15s;
     }
-    .budget-fab:active {
-      transform: translateX(-50%) scale(0.96);
+    .work-fab.secondary {
+      background: #1f2937;
+      color: var(--text-main);
+      border: 1px solid var(--green);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
     }
-    .budget-fab.hidden {
-      display: none;
+    .work-fab:active {
+      transform: scale(0.96);
     }
 
     /* 예산 현황 팝업 모달 */
@@ -354,6 +364,142 @@
       flex: 1;
       border: none;
       background: #f4f6f9;
+    }
+
+    /* 연구비 카드 목록 & 상세 팝업 모달 */
+    #card-list-overlay { z-index: 992; }
+    #card-detail-overlay { z-index: 998; }
+    .cards-modal {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 20px;
+      width: 100%;
+      max-width: 640px;
+      max-height: 88vh;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .card-search-bar {
+      display: flex;
+      gap: 8px;
+    }
+    .card-search-select {
+      width: 120px;
+      flex-shrink: 0;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #1c1c20;
+      color: var(--text-main);
+      font-size: 0.88rem;
+      font-weight: 600;
+      outline: none;
+    }
+    .card-search-input {
+      flex: 1;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #1c1c20;
+      color: var(--text-main);
+      font-size: 0.9rem;
+      outline: none;
+    }
+    .card-search-select:focus, .card-search-input:focus {
+      border-color: var(--green);
+    }
+    .card-row-item {
+      background: var(--sub-card);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--green);
+      border-radius: 12px;
+      padding: 12px 14px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      transition: background 0.15s;
+    }
+    .card-row-item:active { background: #24242a; }
+    .card-row-left { min-width: 0; flex: 1; }
+    .card-row-proj {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .card-row-num {
+      font-size: 0.82rem;
+      color: var(--text-sub);
+      font-family: monospace;
+      letter-spacing: 0.03em;
+    }
+    .card-row-bank {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--green);
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .card-spec-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 10px;
+      max-height: 55vh;
+      overflow-y: auto;
+    }
+    .card-spec-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--sub-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 9px 12px;
+      gap: 10px;
+    }
+    .card-spec-label {
+      font-size: 0.8rem;
+      color: var(--text-sub);
+      flex-shrink: 0;
+    }
+    .card-spec-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .card-spec-val {
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--text-main);
+      text-align: right;
+      word-break: break-all;
+    }
+    .copy-mini-btn {
+      background: #27272a;
+      border: 1px solid #3f3f46;
+      color: var(--text-main);
+      font-size: 0.7rem;
+      padding: 3px 7px;
+      border-radius: 6px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .copy-mini-btn.copied {
+      background: var(--green);
+      border-color: var(--green);
+      color: #000;
+      font-weight: 700;
     }
 
     /* 메인 벤토 그리드 */
@@ -541,7 +687,7 @@
       flex-shrink: 0;
     }
 
-    /* 4. 우측 전체: SCHEDULE 클릭 시 달력 팝업 트리거 */
+    /* 4. 우측 전체: SCHEDULE */
     .schedule-card { grid-row: 1 / 4; grid-column: 2 / 3; }
     .schedule-trigger {
       cursor: pointer;
@@ -735,8 +881,45 @@
     </div>
   </div>
 
-  <!-- 업무 모드 전용: 페이지 하단 예산 현황 버튼 -->
-  <button type="button" class="budget-fab hidden" id="open-budget-btn">📊 예산 현황</button>
+  <!-- 업무 모드 전용: 연구비 카드 목록 팝업 모달 -->
+  <div id="card-list-overlay" class="overlay hidden">
+    <div class="cards-modal">
+      <div class="cal-header">
+        <span class="budget-modal-title">💳 연구비 카드 목록 (<span id="card-total-count">0</span>)</span>
+        <button type="button" class="cal-nav-btn" id="card-list-close-btn">닫기 ✕</button>
+      </div>
+      <div class="card-search-bar">
+        <select id="card-search-field" class="card-search-select">
+          <option value="projectName">과제명</option>
+          <option value="cardNumber">카드번호</option>
+        </select>
+        <input type="text" id="card-search-input" class="card-search-input" placeholder="검색어를 입력하세요..." autocomplete="off" />
+      </div>
+      <div class="list" id="card-list-container" style="flex: 1;"></div>
+    </div>
+  </div>
+
+  <!-- 업무 모드 전용: 연구비 카드 상세 정보 팝업 모달 -->
+  <div id="card-detail-overlay" class="overlay hidden">
+    <div class="modal-box detail-box" style="max-width: 460px;">
+      <div class="detail-header" style="margin-bottom: 6px;">
+        <div>
+          <span class="detail-badge" style="background: rgba(16, 185, 129, 0.18); color: var(--green);">연구비 카드 상세정보</span>
+          <div class="detail-title" id="cd-project-title">과제명</div>
+        </div>
+      </div>
+      <div class="card-spec-grid" id="cd-spec-grid"></div>
+      <div class="modal-actions" style="margin-top: 16px;">
+        <button type="button" class="cancel-btn" id="cd-close-btn">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 업무 모드 전용: 페이지 하단 플로팅 버튼 그룹 -->
+  <div class="work-fab-bar hidden" id="work-fab-bar">
+    <button type="button" class="work-fab" id="open-budget-btn">📊 예산 현황</button>
+    <button type="button" class="work-fab secondary" id="open-cards-btn">💳 연구비 카드</button>
+  </div>
 
   <!-- 대시보드 그리드 -->
   <div class="grid" id="dashboard-grid">
@@ -816,6 +999,7 @@
     let cachedEvents = [];
     let cachedTasks = [];
     let cachedDdays = [];
+    let cachedCards = [];
     let showPastDdays = false;
     let currentDdayIndex = 0;
     let editingDdayRow = 0;
@@ -829,7 +1013,7 @@
     let calViewMonth = new Date().getMonth();
     let calSelectedDateStr = '';
 
-    /* ================= 0. 업무 모드 예산 현황 팝업 ================= */
+    /* ================= 0. 업무 모드 예산 현황 & 연구비 카드 팝업 ================= */
     const BUDGET_PAGE_HTML = `<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -1129,15 +1313,15 @@
 </body>
 </html>`;
 
-    const budgetFab = document.getElementById('open-budget-btn');
+    const workFabBar = document.getElementById('work-fab-bar');
     const budgetOverlay = document.getElementById('budget-overlay');
     const budgetIframe = document.getElementById('budget-iframe');
 
-    function updateBudgetFabVisibility() {
-      budgetFab.classList.toggle('hidden', selectedGroup !== '업무');
+    function updateWorkFabVisibility() {
+      workFabBar.classList.toggle('hidden', selectedGroup !== '업무');
     }
 
-    budgetFab.addEventListener('click', () => {
+    document.getElementById('open-budget-btn').addEventListener('click', () => {
       budgetIframe.srcdoc = BUDGET_PAGE_HTML;
       budgetOverlay.classList.remove('hidden');
     });
@@ -1152,6 +1336,137 @@
         budgetOverlay.classList.add('hidden');
         budgetIframe.srcdoc = '';
       }
+    });
+
+    /* ================= 0-2. 연구비 카드 목록 & 검색 & 상세 팝업 ================= */
+    const cardListOverlay = document.getElementById('card-list-overlay');
+    const cardDetailOverlay = document.getElementById('card-detail-overlay');
+    const cardSearchField = document.getElementById('card-search-field');
+    const cardSearchInput = document.getElementById('card-search-input');
+
+    function renderCardList() {
+      const container = document.getElementById('card-list-container');
+      const countEl = document.getElementById('card-total-count');
+      const field = cardSearchField.value; // 'projectName' | 'cardNumber'
+      const rawQuery = cardSearchInput.value.trim().toLowerCase();
+
+      let filtered = cachedCards || [];
+      if (rawQuery) {
+        if (field === 'cardNumber') {
+          const cleanQuery = rawQuery.replace(/[^0-9]/g, '');
+          filtered = filtered.filter(c => {
+            const cleanNum = (c.cardNumber || '').replace(/[^0-9]/g, '');
+            return cleanQuery ? cleanNum.includes(cleanQuery) : (c.cardNumber || '').toLowerCase().includes(rawQuery);
+          });
+        } else {
+          filtered = filtered.filter(c => (c.projectName || '').toLowerCase().includes(rawQuery));
+        }
+      }
+
+      countEl.textContent = filtered.length;
+      container.innerHTML = '';
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div class="empty-msg">조건에 맞는 연구비 카드가 없습니다.</div>';
+        return;
+      }
+
+      filtered.forEach(card => {
+        const row = document.createElement('div');
+        row.className = 'card-row-item';
+        row.innerHTML = `
+          <div class="card-row-left">
+            <div class="card-row-proj"></div>
+            <div class="card-row-num"></div>
+          </div>
+          <span class="card-row-bank"></span>
+        `;
+        row.querySelector('.card-row-proj').textContent = card.projectName || '(과제명 미입력)';
+        row.querySelector('.card-row-num').textContent = card.cardNumber || '-';
+        row.querySelector('.card-row-bank').textContent = card.bank || '카드상세';
+        row.addEventListener('click', () => openCardDetail(card));
+        container.appendChild(row);
+      });
+    }
+
+    function openCardDetail(card) {
+      document.getElementById('cd-project-title').textContent = card.projectName || '(과제명 미입력)';
+      const grid = document.getElementById('cd-spec-grid');
+      grid.innerHTML = '';
+
+      const fields = [
+        { label: '과제명', value: card.projectName },
+        { label: '카드번호', value: card.cardNumber },
+        { label: '유효기간', value: card.expiry },
+        { label: 'CVC', value: card.cvc },
+        { label: '법인명', value: card.corpName },
+        { label: '결제은행', value: card.bank },
+        { label: '결제일', value: card.billingDay },
+        { label: '명의자명', value: card.holderName },
+        { label: '명의자 생년월일', value: card.holderBirth }
+      ];
+
+      fields.forEach(f => {
+        const row = document.createElement('div');
+        row.className = 'card-spec-row';
+        const displayVal = f.value || '-';
+        row.innerHTML = `
+          <span class="card-spec-label">${f.label}</span>
+          <div class="card-spec-right">
+            <span class="card-spec-val"></span>
+            ${f.value ? '<button type="button" class="copy-mini-btn">복사</button>' : ''}
+          </div>
+        `;
+        row.querySelector('.card-spec-val').textContent = displayVal;
+
+        const copyBtn = row.querySelector('.copy-mini-btn');
+        if (copyBtn) {
+          copyBtn.addEventListener('click', async () => {
+            try {
+              await navigator.clipboard.writeText(f.value);
+              copyBtn.textContent = '완료';
+              copyBtn.classList.add('copied');
+              setTimeout(() => {
+                copyBtn.textContent = '복사';
+                copyBtn.classList.remove('copied');
+              }, 1200);
+            } catch {}
+          });
+        }
+        grid.appendChild(row);
+      });
+
+      cardDetailOverlay.classList.remove('hidden');
+    }
+
+    document.getElementById('open-cards-btn').addEventListener('click', () => {
+      cardSearchInput.value = '';
+      renderCardList();
+      cardListOverlay.classList.remove('hidden');
+    });
+
+    cardSearchField.addEventListener('change', () => {
+      cardSearchInput.placeholder = cardSearchField.value === 'cardNumber'
+        ? '카드번호 입력 (숫자만 입력 가능)...'
+        : '과제명을 입력하세요...';
+      renderCardList();
+      cardSearchInput.focus();
+    });
+
+    cardSearchInput.addEventListener('input', renderCardList);
+
+    document.getElementById('card-list-close-btn').addEventListener('click', () => {
+      cardListOverlay.classList.add('hidden');
+    });
+    cardListOverlay.addEventListener('click', (e) => {
+      if (e.target === cardListOverlay) cardListOverlay.classList.add('hidden');
+    });
+
+    document.getElementById('cd-close-btn').addEventListener('click', () => {
+      cardDetailOverlay.classList.add('hidden');
+    });
+    cardDetailOverlay.addEventListener('click', (e) => {
+      if (e.target === cardDetailOverlay) cardDetailOverlay.classList.add('hidden');
     });
 
     /* ================= 1. 최초 1회 페어링 ================= */
@@ -1840,7 +2155,7 @@
         selectedCategory = 'ALL';
         currentDdayIndex = 0;
 
-        updateBudgetFabVisibility();
+        updateWorkFabVisibility();
         renderSubCategories();
         renderSchedules();
         renderTasks();
@@ -1882,6 +2197,7 @@
           cachedEvents = [];
           cachedTasks = [];
           cachedDdays = [];
+          cachedCards = [];
           renderSubCategories();
           renderSchedules();
           renderTasks();
@@ -1900,6 +2216,7 @@
         cachedEvents = data.events || [];
         cachedTasks = data.tasks || [];
         cachedDdays = data.ddays || [];
+        cachedCards = data.cards || [];
 
         renderSubCategories();
         renderSchedules();
@@ -1965,6 +2282,7 @@
         cachedEvents = [];
         cachedTasks = [];
         cachedDdays = [];
+        cachedCards = [];
         renderSubCategories();
         renderSchedules();
         renderTasks();
@@ -1976,7 +2294,7 @@
     /* ================= 10. 초기화 실행 ================= */
     initPairing();
     updateClock();
-    updateBudgetFabVisibility();
+    updateWorkFabVisibility();
     renderDday();
     fetchWeather();
     fetchDashboardData();
