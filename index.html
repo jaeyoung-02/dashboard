@@ -6,6 +6,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <title>Desk Dashboard</title>
+  <link rel="preconnect" href="https://script.google.com" crossorigin />
+  <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin />
+  <link rel="preconnect" href="https://api.open-meteo.com" crossorigin />
   <style>
     :root {
       --bg: #000000;
@@ -290,7 +293,7 @@
       margin-bottom: 2px;
     }
 
-    /* 업무 모드 전용 하단 플로팅 버튼 그룹 (예산 현황 + 연구비 카드) */
+    /* 업무 모드 전용 하단 플로팅 버튼 그룹 */
     .work-fab-bar {
       position: fixed;
       bottom: 22px;
@@ -955,7 +958,7 @@
         <span class="dday-count" id="dday-count">D-?</span>
         <div class="dday-label-wrap">
           <span class="dday-group-badge" id="dday-group-badge" style="display:none;">개인</span>
-          <span class="dday-label" id="dday-label">시트에서 불러오는 중...</span>
+          <span class="dday-label" id="dday-label">불러오는 중...</span>
         </div>
       </div>
     </div>
@@ -995,6 +998,8 @@
   <script>
     const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbyP9FFbaBjKNrDfc1OcrfP0UnA4yy5ue86zwYx8ids32isjxReJiIWGz0lJQ5IfJ7N3dQ/exec";
     const STORAGE_KEY = "DESK_PAIRED_TOKEN";
+    const DATA_CACHE_KEY = "DESK_DATA_CACHE_V1";
+    const WEATHER_CACHE_KEY = "DESK_WEATHER_CACHE_V1";
 
     let cachedEvents = [];
     let cachedTasks = [];
@@ -1347,7 +1352,7 @@
     function renderCardList() {
       const container = document.getElementById('card-list-container');
       const countEl = document.getElementById('card-total-count');
-      const field = cardSearchField.value; // 'projectName' | 'cardNumber'
+      const field = cardSearchField.value;
       const rawQuery = cardSearchInput.value.trim().toLowerCase();
 
       let filtered = cachedCards || [];
@@ -1922,6 +1927,7 @@
           cachedDdays.push(result.item);
         }
 
+        saveLocalDataCache();
         currentDdayIndex = 0;
         renderDday();
         ddayOverlay.classList.add('hidden');
@@ -1993,6 +1999,7 @@
         if (result.status !== 'ok') throw new Error('Add failed');
 
         cachedTasks.unshift(result.item);
+        saveLocalDataCache();
         renderTasks();
 
         taskOverlay.classList.add('hidden');
@@ -2163,20 +2170,68 @@
       });
     });
 
-    /* ================= 9. 날씨 및 Apps Script 동기화 ================= */
+    /* ================= 9. 로컬 캐시 즉시 렌더링 & 백그라운드 동기화 ================= */
+    function renderAllWidgets() {
+      renderSubCategories();
+      renderSchedules();
+      renderTasks();
+      renderDday();
+    }
+
+    function saveLocalDataCache() {
+      try {
+        localStorage.setItem(DATA_CACHE_KEY, JSON.stringify({
+          events: cachedEvents,
+          tasks: cachedTasks,
+          ddays: cachedDdays,
+          cards: cachedCards
+        }));
+      } catch {}
+    }
+
+    function hydrateFromLocalCache() {
+      try {
+        const rawWeather = localStorage.getItem(WEATHER_CACHE_KEY);
+        if (rawWeather) {
+          const w = JSON.parse(rawWeather);
+          if (w.temp) document.getElementById('temp').textContent = w.temp;
+          if (w.desc) document.getElementById('weather-desc').textContent = w.desc;
+        }
+      } catch {}
+
+      try {
+        const rawData = localStorage.getItem(DATA_CACHE_KEY);
+        if (rawData) {
+          const d = JSON.parse(rawData);
+          cachedEvents = d.events || [];
+          cachedTasks = d.tasks || [];
+          cachedDdays = d.ddays || [];
+          cachedCards = d.cards || [];
+          renderAllWidgets();
+          return true;
+        }
+      } catch {}
+      return false;
+    }
+
     async function fetchWeather() {
       try {
         const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.9780&current=temperature_2m,weather_code&timezone=Asia%2FSeoul');
         const data = await res.json();
         const codeMap = { 0: '맑음', 1: '대체로 맑음', 2: '구름 조금', 3: '흐림', 45: '안개', 61: '비', 71: '눈', 95: '뇌우' };
-        document.getElementById('temp').textContent = `${Math.round(data.current.temperature_2m)}°C`;
-        document.getElementById('weather-desc').textContent = codeMap[data.current.weather_code] || '보통';
+        const tempStr = `${Math.round(data.current.temperature_2m)}°C`;
+        const descStr = codeMap[data.current.weather_code] || '보통';
+        document.getElementById('temp').textContent = tempStr;
+        document.getElementById('weather-desc').textContent = descStr;
+        localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({ temp: tempStr, desc: descStr }));
       } catch {
-        document.getElementById('weather-desc').textContent = '날씨 오류';
+        if (!localStorage.getItem(WEATHER_CACHE_KEY)) {
+          document.getElementById('weather-desc').textContent = '날씨 오류';
+        }
       }
     }
 
-    async function fetchDashboardData() {
+    async function fetchDashboardData(forceRefresh = false) {
       const token = localStorage.getItem(STORAGE_KEY);
       if (!token) {
         showPairingScreen();
@@ -2189,19 +2244,18 @@
 
       try {
         document.getElementById('sync-status').textContent = 'SYNCING';
-        const res = await fetch(`${GAS_ENDPOINT}?token=${encodeURIComponent(token)}`);
+        const url = `${GAS_ENDPOINT}?token=${encodeURIComponent(token)}${forceRefresh ? '&force=1' : ''}`;
+        const res = await fetch(url);
         const data = await res.json();
 
         if (data.status === 'unauthorized') {
           localStorage.removeItem(STORAGE_KEY);
+          localStorage.removeItem(DATA_CACHE_KEY);
           cachedEvents = [];
           cachedTasks = [];
           cachedDdays = [];
           cachedCards = [];
-          renderSubCategories();
-          renderSchedules();
-          renderTasks();
-          renderDday();
+          renderAllWidgets();
           showPairingScreen('유효하지 않거나 만료된 토큰입니다. 다시 페어링하세요.');
           return;
         }
@@ -2218,10 +2272,9 @@
         cachedDdays = data.ddays || [];
         cachedCards = data.cards || [];
 
-        renderSubCategories();
-        renderSchedules();
-        renderTasks();
-        renderDday();
+        saveLocalDataCache();
+        renderAllWidgets();
+        if (!cardListOverlay.classList.contains('hidden')) renderCardList();
 
         document.getElementById('sync-status').textContent = 'SYNCED';
       } catch {
@@ -2237,6 +2290,7 @@
       const prevDone = taskObj.done;
 
       taskObj.done = nextDone;
+      saveLocalDataCache();
       renderTasks();
       syncStatusEl.textContent = 'SAVING';
 
@@ -2257,19 +2311,20 @@
         syncStatusEl.textContent = 'SYNCED';
       } catch {
         taskObj.done = prevDone;
+        saveLocalDataCache();
         renderTasks();
         syncStatusEl.textContent = 'SAVE_ERR';
       }
     }
 
-    document.getElementById('sync-status').addEventListener('click', fetchDashboardData);
+    document.getElementById('sync-status').addEventListener('click', () => fetchDashboardData(true));
 
     document.getElementById('pair-submit').addEventListener('click', () => {
       const val = tokenInput.value.trim();
       if (!val) return;
       localStorage.setItem(STORAGE_KEY, val);
       keepScreenAwake();
-      fetchDashboardData();
+      fetchDashboardData(true);
     });
 
     tokenInput.addEventListener('keydown', (e) => {
@@ -2279,31 +2334,31 @@
     document.getElementById('unpair-btn').addEventListener('click', () => {
       if (confirm('이 기기의 페어링을 해제할까요?')) {
         localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(DATA_CACHE_KEY);
         cachedEvents = [];
         cachedTasks = [];
         cachedDdays = [];
         cachedCards = [];
-        renderSubCategories();
-        renderSchedules();
-        renderTasks();
-        renderDday();
+        renderAllWidgets();
         showPairingScreen('페어링이 해제되었습니다.');
       }
     });
 
-    /* ================= 10. 초기화 실행 ================= */
+    /* ================= 10. 초기화 실행 (로컬 캐시 0.05초 선렌더링 후 백그라운드 동기화) ================= */
     initPairing();
     updateClock();
     updateWorkFabVisibility();
-    renderDday();
+    const hasCache = hydrateFromLocalCache();
+    if (!hasCache) renderDday();
+
     fetchWeather();
-    fetchDashboardData();
+    fetchDashboardData(false);
 
     setInterval(updateClock, 1000);
     setInterval(renderDday, 60 * 60 * 1000);
     setInterval(shiftPixels, 5 * 60 * 1000);
     setInterval(fetchWeather, 30 * 60 * 1000);
-    setInterval(fetchDashboardData, 5 * 60 * 1000);
+    setInterval(() => fetchDashboardData(false), 5 * 60 * 1000);
   </script>
 </body>
 </html>
