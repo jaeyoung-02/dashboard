@@ -82,6 +82,12 @@
       border-color: var(--accent);
       color: var(--text-main);
     }
+    .tag-chip[data-val="업무"].selected,
+    .tag-chip[data-list="업무"].selected {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: var(--green);
+      color: var(--text-main);
+    }
     .modal-actions { display: flex; gap: 8px; }
     .modal-box button.primary-btn {
       flex: 1;
@@ -142,10 +148,16 @@
       padding: 3px 8px;
       border-radius: 6px;
       cursor: pointer;
+      transition: all 0.15s;
     }
     .mini-btn.accent {
       border-color: var(--accent);
       color: var(--accent);
+    }
+    .mini-btn.active {
+      background: #27272a;
+      border-color: #52525b;
+      color: var(--text-main);
     }
     #sync-status {
       cursor: pointer;
@@ -170,6 +182,12 @@
     .dday-card {
       cursor: pointer;
       justify-content: space-between;
+      user-select: none;
+    }
+    .dday-actions {
+      display: flex;
+      align-items: center;
+      gap: 5px;
     }
     .dday-main {
       display: flex;
@@ -183,6 +201,27 @@
       font-weight: 700;
       color: var(--accent);
       flex-shrink: 0;
+    }
+    .dday-count.today { color: var(--green); }
+    .dday-count.past { color: var(--text-sub); }
+    .dday-label-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+    .dday-group-badge {
+      font-size: 0.68rem;
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: rgba(59, 130, 246, 0.16);
+      color: var(--accent);
+      flex-shrink: 0;
+      font-weight: 600;
+    }
+    .dday-group-badge.work {
+      background: rgba(16, 185, 129, 0.16);
+      color: var(--green);
     }
     .dday-label {
       font-size: 1rem;
@@ -274,7 +313,6 @@
       color: #000000;
     }
 
-    /* 세부 카테고리 서브 바 */
     .sub-filter-bar {
       display: flex;
       gap: 6px;
@@ -330,16 +368,20 @@
     </div>
   </div>
 
-  <!-- 디데이 설정 모달 -->
+  <!-- 디데이 추가/수정 모달 (구글 시트 연동 + 분류 선택) -->
   <div id="dday-overlay" class="overlay hidden">
     <div class="modal-box">
-      <h2>D-Day 목표 설정</h2>
-      <p>디데이 제목과 목표 날짜를 지정하세요.</p>
-      <input type="text" id="dday-title-input" placeholder="예: 프로젝트 마감" maxlength="20" />
+      <h2 id="dday-modal-title">D-Day 설정</h2>
+      <p>구글 시트 Dday 탭(A:제목, B:목표일, C:분류)에 저장됩니다.</p>
+      <div class="tag-chips" id="dday-group-chips">
+        <button type="button" class="tag-chip selected" data-val="개인">개인</button>
+        <button type="button" class="tag-chip" data-val="업무">업무</button>
+      </div>
+      <input type="text" id="dday-title-input" placeholder="예: 프로젝트 마감" maxlength="30" />
       <input type="date" id="dday-date-input" />
       <div class="modal-actions">
         <button class="cancel-btn" id="dday-cancel">취소</button>
-        <button class="primary-btn" id="dday-save">저장</button>
+        <button class="primary-btn" id="dday-save">시트에 저장</button>
       </div>
     </div>
   </div>
@@ -381,14 +423,22 @@
     </div>
 
     <!-- 좌측 중단: D-Day 단독 위젯 -->
-    <div class="card dday-card" id="dday-widget" title="터치하여 디데이 수정">
+    <div class="card dday-card" id="dday-widget" title="터치하여 다음 D-Day 보기">
       <div class="card-title">
-        <span>D-DAY</span>
-        <span id="dday-target-date">--.--</span>
+        <span>D-DAY <span id="dday-index-badge"></span></span>
+        <div class="dday-actions">
+          <span id="dday-target-date" style="margin-right: 2px;">--.--</span>
+          <button type="button" class="mini-btn" id="dday-past-toggle" title="이미 지난 D+ 항목 표시 전환">지난일정</button>
+          <button type="button" class="mini-btn" id="dday-edit-btn">수정</button>
+          <button type="button" class="mini-btn accent" id="dday-add-btn">+</button>
+        </div>
       </div>
       <div class="dday-main">
         <span class="dday-count" id="dday-count">D-?</span>
-        <span class="dday-label" id="dday-label">터치하여 목표 설정</span>
+        <div class="dday-label-wrap">
+          <span class="dday-group-badge" id="dday-group-badge" style="display:none;">개인</span>
+          <span class="dday-label" id="dday-label">시트에서 불러오는 중...</span>
+        </div>
       </div>
     </div>
 
@@ -411,7 +461,6 @@
           <button type="button" class="filter-btn" data-group="업무">업무</button>
         </div>
       </div>
-      <!-- 대분류(개인/업무) 선택 시 나타나는 세부 카테고리 바 -->
       <div class="sub-filter-bar hidden" id="sub-category-bar"></div>
       <div class="list" id="schedule-list"></div>
     </div>
@@ -420,12 +469,16 @@
   <script>
     const GAS_ENDPOINT = "%%GAS_ENDPOINT%%";
     const STORAGE_KEY = "DESK_PAIRED_TOKEN";
-    const DDAY_STORAGE_KEY = "DESK_DDAY_CONFIG";
 
     let cachedEvents = [];
     let cachedTasks = [];
-    let selectedGroup = 'ALL';     // 'ALL' | '개인' | '업무'
-    let selectedCategory = 'ALL';  // 'ALL' | 세부 카테고리명
+    let cachedDdays = [];
+    let showPastDdays = false;
+    let currentDdayIndex = 0;
+    let editingDdayRow = 0;
+    let selectedModalDdayGroup = '개인';
+    let selectedGroup = 'ALL'; // 'ALL' | '개인' | '업무'
+    let selectedCategory = 'ALL';
 
     /* ================= 1. 최초 1회 페어링 ================= */
     const pairingOverlay = document.getElementById('pairing-overlay');
@@ -488,56 +541,198 @@
       if (h === 4 && m === 0 && s === 0) location.reload();
     }
 
-    /* ================= 4. 디데이(D-Day) 카운터 ================= */
+    /* ================= 4. 구글 시트 연동 디데이 (분류 필터 + 가까운 순 + 지난일정 토글) ================= */
     const ddayOverlay = document.getElementById('dday-overlay');
+    const ddayModalTitle = document.getElementById('dday-modal-title');
     const ddayTitleInput = document.getElementById('dday-title-input');
     const ddayDateInput = document.getElementById('dday-date-input');
+    const ddaySaveBtn = document.getElementById('dday-save');
+    const pastToggleBtn = document.getElementById('dday-past-toggle');
+
+    document.querySelectorAll('#dday-group-chips .tag-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#dday-group-chips .tag-chip').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedModalDdayGroup = btn.dataset.val;
+      });
+    });
+
+    function setModalDdayGroup(val) {
+      selectedModalDdayGroup = val === '업무' ? '업무' : '개인';
+      document.querySelectorAll('#dday-group-chips .tag-chip').forEach(b => {
+        b.classList.toggle('selected', b.dataset.val === selectedModalDdayGroup);
+      });
+    }
+
+    function getVisibleDdays() {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      let list = cachedDdays || [];
+      if (selectedGroup !== 'ALL') {
+        list = list.filter(item => (item.group || '개인') === selectedGroup);
+      }
+
+      const enriched = list.map(item => {
+        const target = new Date(item.date + 'T00:00:00');
+        const diffDays = Math.round((target - today) / (1000 * 60 * 60 * 24));
+        return { ...item, diffDays };
+      }).sort((a, b) => a.diffDays - b.diffDays);
+
+      if (!showPastDdays) {
+        return enriched.filter(item => item.diffDays >= 0);
+      }
+      return enriched;
+    }
 
     function renderDday() {
-      const saved = JSON.parse(localStorage.getItem(DDAY_STORAGE_KEY) || 'null');
       const countEl = document.getElementById('dday-count');
       const labelEl = document.getElementById('dday-label');
+      const groupBadgeEl = document.getElementById('dday-group-badge');
       const dateEl = document.getElementById('dday-target-date');
+      const badgeEl = document.getElementById('dday-index-badge');
+      const editBtn = document.getElementById('dday-edit-btn');
 
-      if (!saved || !saved.date) {
+      pastToggleBtn.classList.toggle('active', showPastDdays);
+
+      const visibleList = getVisibleDdays();
+
+      if (visibleList.length === 0) {
         countEl.textContent = 'D-?';
-        labelEl.textContent = '터치하여 목표 설정';
+        countEl.className = 'dday-count';
+        groupBadgeEl.style.display = 'none';
+        labelEl.textContent = selectedGroup !== 'ALL'
+          ? `${selectedGroup} D-Day 없음 (+ 버튼으로 추가)`
+          : (cachedDdays.length > 0 ? '다가오는 D-Day 없음 (지난일정 확인)' : '+ 버튼을 눌러 D-Day 추가');
         dateEl.textContent = '--.--';
+        badgeEl.textContent = '';
+        editBtn.style.display = 'none';
         return;
       }
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const target = new Date(saved.date + 'T00:00:00');
-      const diffDays = Math.round((target - today) / (1000 * 60 * 60 * 24));
+      if (currentDdayIndex >= visibleList.length) currentDdayIndex = 0;
+      const item = visibleList[currentDdayIndex];
 
-      if (diffDays === 0) countEl.textContent = 'D-DAY';
-      else if (diffDays > 0) countEl.textContent = `D-${diffDays}`;
-      else countEl.textContent = `D+${Math.abs(diffDays)}`;
+      countEl.className = 'dday-count';
+      if (item.diffDays === 0) {
+        countEl.textContent = 'D-DAY';
+        countEl.classList.add('today');
+      } else if (item.diffDays > 0) {
+        countEl.textContent = `D-${item.diffDays}`;
+      } else {
+        countEl.textContent = `D+${Math.abs(item.diffDays)}`;
+        countEl.classList.add('past');
+      }
 
-      labelEl.textContent = saved.title || '목표일';
-      dateEl.textContent = saved.date.slice(5).replace('-', '.');
+      const itemGroup = item.group || '개인';
+      groupBadgeEl.style.display = 'inline-block';
+      groupBadgeEl.textContent = itemGroup;
+      groupBadgeEl.className = 'dday-group-badge' + (itemGroup === '업무' ? ' work' : '');
+
+      labelEl.textContent = item.title;
+      dateEl.textContent = item.date.slice(5).replace('-', '.');
+      badgeEl.textContent = visibleList.length > 1 ? `(${currentDdayIndex + 1}/${visibleList.length})` : '';
+      editBtn.style.display = 'inline-block';
     }
 
-    document.getElementById('dday-widget').addEventListener('click', () => {
-      const saved = JSON.parse(localStorage.getItem(DDAY_STORAGE_KEY) || '{}');
-      ddayTitleInput.value = saved.title || '';
-      ddayDateInput.value = saved.date || '';
+    pastToggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showPastDdays = !showPastDdays;
+      currentDdayIndex = 0;
+      renderDday();
+    });
+
+    document.getElementById('dday-widget').addEventListener('click', (e) => {
+      if (e.target.closest('button')) return;
+      const visibleList = getVisibleDdays();
+      if (visibleList.length > 1) {
+        currentDdayIndex = (currentDdayIndex + 1) % visibleList.length;
+        renderDday();
+      } else if (visibleList.length === 0) {
+        openDdayModal(0);
+      }
+    });
+
+    function openDdayModal(rowToEdit) {
+      editingDdayRow = rowToEdit;
+      const visibleList = getVisibleDdays();
+      const currentItem = visibleList[currentDdayIndex];
+
+      if (rowToEdit >= 2 && currentItem) {
+        ddayModalTitle.textContent = 'D-Day 수정';
+        ddayTitleInput.value = currentItem.title;
+        ddayDateInput.value = currentItem.date;
+        setModalDdayGroup(currentItem.group || '개인');
+      } else {
+        ddayModalTitle.textContent = '새 D-Day 추가';
+        ddayTitleInput.value = '';
+        ddayDateInput.value = '';
+        setModalDdayGroup(selectedGroup === '업무' ? '업무' : '개인');
+      }
       ddayOverlay.classList.remove('hidden');
+      ddayTitleInput.focus();
+    }
+
+    document.getElementById('dday-edit-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const visibleList = getVisibleDdays();
+      const targetRow = visibleList[currentDdayIndex] ? visibleList[currentDdayIndex].row : 0;
+      openDdayModal(targetRow);
+    });
+
+    document.getElementById('dday-add-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openDdayModal(0);
     });
 
     document.getElementById('dday-cancel').addEventListener('click', () => {
       ddayOverlay.classList.add('hidden');
     });
 
-    document.getElementById('dday-save').addEventListener('click', () => {
+    ddaySaveBtn.addEventListener('click', async () => {
       const title = ddayTitleInput.value.trim();
       const date = ddayDateInput.value;
-      if (date) {
-        localStorage.setItem(DDAY_STORAGE_KEY, JSON.stringify({ title, date }));
+      const token = localStorage.getItem(STORAGE_KEY);
+      if (!title || !date || !token || !GAS_ENDPOINT.startsWith('http')) return;
+
+      ddaySaveBtn.disabled = true;
+      ddaySaveBtn.textContent = '저장 중...';
+      document.getElementById('sync-status').textContent = 'SAVING';
+
+      try {
+        const res = await fetch(GAS_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'save_dday',
+            token: token,
+            row: editingDdayRow,
+            title: title,
+            date: date,
+            group: selectedModalDdayGroup
+          })
+        });
+        const result = await res.json();
+        if (result.status !== 'ok') throw new Error('Save failed');
+
+        if (editingDdayRow >= 2) {
+          const idx = cachedDdays.findIndex(d => d.row === editingDdayRow);
+          if (idx !== -1) cachedDdays[idx] = result.item;
+        } else {
+          cachedDdays.push(result.item);
+        }
+
+        currentDdayIndex = 0;
         renderDday();
+        ddayOverlay.classList.add('hidden');
+        document.getElementById('sync-status').textContent = 'SYNCED';
+      } catch {
+        document.getElementById('sync-status').textContent = 'SAVE_ERR';
+        alert('D-Day 저장에 실패했습니다. DDAY_SHEET_ID 설정을 확인하세요.');
+      } finally {
+        ddaySaveBtn.disabled = false;
+        ddaySaveBtn.textContent = '시트에 저장';
       }
-      ddayOverlay.classList.add('hidden');
     });
 
     /* ================= 5. 새 할 일(Google Tasks) 모달 ================= */
@@ -555,7 +750,6 @@
     });
 
     document.getElementById('open-task-btn').addEventListener('click', () => {
-      // 현재 '업무' 필터 중이라면 기본 추가 대상도 '업무'로 자동 선택
       const defaultTarget = selectedGroup === '업무' ? '업무' : '내 할 일';
       document.querySelectorAll('#task-list-chips .tag-chip').forEach(b => {
         b.classList.toggle('selected', b.dataset.list === defaultTarget);
@@ -618,7 +812,6 @@
         return;
       }
 
-      // 선택된 대분류('개인' 또는 '업무')에 존재하는 세부 카테고리 추출
       const groupEvents = cachedEvents.filter(ev => ev.group === selectedGroup);
       const categories = ['ALL', ...new Set(groupEvents.map(ev => ev.category).filter(Boolean))];
 
@@ -678,11 +871,9 @@
 
       let filteredTasks = cachedTasks;
       if (selectedGroup === '업무') {
-        // 업무 버튼 선택 시 Google Tasks 목록 이름이 '업무'인 항목만 표시
         filteredTasks = cachedTasks.filter(t => t.listTitle === '업무');
         badgeEl.textContent = '업무 목록만';
       } else if (selectedGroup === '개인') {
-        // 개인 버튼 선택 시 '업무' 목록을 제외한 개인 할 일 목록 표시
         filteredTasks = cachedTasks.filter(t => t.listTitle !== '업무');
         badgeEl.textContent = '개인 목록';
       } else {
@@ -716,16 +907,18 @@
       });
     }
 
-    // 상단 분류(전체 / 개인 / 업무) 버튼 이벤트
     document.querySelectorAll('#group-filters .filter-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('#group-filters .filter-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         selectedGroup = btn.dataset.group;
-        selectedCategory = 'ALL'; // 대분류 변경 시 세부 카테고리 초기화
+        selectedCategory = 'ALL';
+        currentDdayIndex = 0;
+
         renderSubCategories();
         renderSchedules();
-        renderTasks(); // Google Tasks 목록도 연동하여 즉시 필터링
+        renderTasks();
+        renderDday();
       });
     });
 
@@ -762,9 +955,11 @@
           localStorage.removeItem(STORAGE_KEY);
           cachedEvents = [];
           cachedTasks = [];
+          cachedDdays = [];
           renderSubCategories();
           renderSchedules();
           renderTasks();
+          renderDday();
           showPairingScreen('유효하지 않거나 만료된 토큰입니다. 다시 페어링하세요.');
           return;
         }
@@ -778,9 +973,12 @@
 
         cachedEvents = data.events || [];
         cachedTasks = data.tasks || [];
+        cachedDdays = data.ddays || [];
+
         renderSubCategories();
         renderSchedules();
         renderTasks();
+        renderDday();
 
         document.getElementById('sync-status').textContent = 'SYNCED';
       } catch {
@@ -843,9 +1041,11 @@
         localStorage.removeItem(STORAGE_KEY);
         cachedEvents = [];
         cachedTasks = [];
+        cachedDdays = [];
         renderSubCategories();
         renderSchedules();
         renderTasks();
+        renderDday();
         showPairingScreen('페어링이 해제되었습니다.');
       }
     });
