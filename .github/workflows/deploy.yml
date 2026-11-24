@@ -1,0 +1,31 @@
+name: Build and Deploy Dashboard
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Inject GAS Endpoint URL
+        run: |
+          if [ -z "${{ secrets.GAS_ENDPOINT }}" ]; then
+            echo "Error: GAS_ENDPOINT secret is not set."
+            exit 1
+          fi
+          sed -i "s|%%GAS_ENDPOINT%%|${{ secrets.GAS_ENDPOINT }}|g" index.html
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./
+          exclude_assets: '.github'
