@@ -139,6 +139,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 6px;
     }
     .mini-btn {
       background: transparent;
@@ -233,6 +234,11 @@
     }
 
     /* 3. Google Tasks 할 일 */
+    .task-controls {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
     .list { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
     .feed-item {
       padding: 9px 10px;
@@ -442,11 +448,16 @@
       </div>
     </div>
 
-    <!-- 좌측 하단: Google Tasks 할 일 -->
+    <!-- 좌측 하단: Google Tasks 할 일 (미완료/완료/전체 분류) -->
     <div class="card">
       <div class="card-title">
-        <span>GOOGLE TASKS (<span id="task-filter-badge">전체</span>)</span>
-        <button class="mini-btn accent" id="open-task-btn">+ 할 일</button>
+        <span>TASKS (<span id="task-count">0</span>)</span>
+        <div class="task-controls" id="task-status-filters">
+          <button type="button" class="mini-btn active" data-status="TODO">미완료</button>
+          <button type="button" class="mini-btn" data-status="DONE">완료</button>
+          <button type="button" class="mini-btn" data-status="ALL">전체</button>
+          <button type="button" class="mini-btn accent" id="open-task-btn">+ 할 일</button>
+        </div>
       </div>
       <div class="list" id="task-list"></div>
     </div>
@@ -477,8 +488,9 @@
     let currentDdayIndex = 0;
     let editingDdayRow = 0;
     let selectedModalDdayGroup = '개인';
-    let selectedGroup = 'ALL'; // 'ALL' | '개인' | '업무'
+    let selectedGroup = 'ALL';      // 'ALL' | '개인' | '업무'
     let selectedCategory = 'ALL';
+    let selectedTaskStatus = 'TODO'; // 'TODO' (미완료) | 'DONE' (완료) | 'ALL' (전체)
 
     /* ================= 1. 최초 1회 페어링 ================= */
     const pairingOverlay = document.getElementById('pairing-overlay');
@@ -541,7 +553,7 @@
       if (h === 4 && m === 0 && s === 0) location.reload();
     }
 
-    /* ================= 4. 구글 시트 연동 디데이 (분류 필터 + 가까운 순 + 지난일정 토글) ================= */
+    /* ================= 4. 구글 시트 연동 디데이 ================= */
     const ddayOverlay = document.getElementById('dday-overlay');
     const ddayModalTitle = document.getElementById('dday-modal-title');
     const ddayTitleInput = document.getElementById('dday-title-input');
@@ -802,7 +814,7 @@
       if (e.key === 'Enter') submitNewTask();
     });
 
-    /* ================= 6. 분류(개인/업무) & 카테고리별 일정 + Tasks 렌더링 ================= */
+    /* ================= 6. 분류(개인/업무) & 카테고리별 일정 + Tasks(완료/미완료) 렌더링 ================= */
     function renderSubCategories() {
       const subBar = document.getElementById('sub-category-bar');
       subBar.innerHTML = '';
@@ -866,26 +878,37 @@
 
     function renderTasks() {
       const taskEl = document.getElementById('task-list');
-      const badgeEl = document.getElementById('task-filter-badge');
+      const countEl = document.getElementById('task-count');
       taskEl.innerHTML = '';
 
+      // 1) 상단 전체/개인/업무 그룹 필터 적용
       let filteredTasks = cachedTasks;
       if (selectedGroup === '업무') {
-        filteredTasks = cachedTasks.filter(t => t.listTitle === '업무');
-        badgeEl.textContent = '업무 목록만';
+        filteredTasks = filteredTasks.filter(t => t.listTitle === '업무');
       } else if (selectedGroup === '개인') {
-        filteredTasks = cachedTasks.filter(t => t.listTitle !== '업무');
-        badgeEl.textContent = '개인 목록';
-      } else {
-        badgeEl.textContent = '전체';
+        filteredTasks = filteredTasks.filter(t => t.listTitle !== '업무');
       }
 
-      if (filteredTasks.length === 0) {
-        taskEl.innerHTML = '<div class="empty-msg">표시할 할 일이 없습니다.</div>';
+      // 2) 미완료 / 완료 / 전체 상태 필터 적용
+      if (selectedTaskStatus === 'TODO') {
+        filteredTasks = filteredTasks.filter(t => !t.done);
+      } else if (selectedTaskStatus === 'DONE') {
+        filteredTasks = filteredTasks.filter(t => t.done);
+      }
+
+      // 3) 전체 보기일 경우 미완료를 위쪽에, 완료를 아래쪽에 정렬
+      const sortedTasks = [...filteredTasks].sort((a, b) => Number(a.done) - Number(b.done));
+      countEl.textContent = sortedTasks.length;
+
+      if (sortedTasks.length === 0) {
+        const emptyLabel = selectedTaskStatus === 'TODO'
+          ? '남은 할 일이 없습니다.'
+          : (selectedTaskStatus === 'DONE' ? '완료된 할 일이 없습니다.' : '표시할 할 일이 없습니다.');
+        taskEl.innerHTML = `<div class="empty-msg">${emptyLabel}</div>`;
         return;
       }
 
-      filteredTasks.forEach(t => {
+      sortedTasks.forEach(t => {
         const div = document.createElement('div');
         div.className = 'feed-item' + (t.done ? ' done' : '');
         const isWork = t.listTitle === '업무';
@@ -906,6 +929,16 @@
         taskEl.appendChild(div);
       });
     }
+
+    // Tasks 미완료 / 완료 / 전체 버튼 이벤트
+    document.querySelectorAll('#task-status-filters button[data-status]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#task-status-filters button[data-status]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedTaskStatus = btn.dataset.status;
+        renderTasks();
+      });
+    });
 
     document.querySelectorAll('#group-filters .filter-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -990,12 +1023,11 @@
       const token = localStorage.getItem(STORAGE_KEY);
       if (!token || !taskObj.taskId || !GAS_ENDPOINT.startsWith('http')) return;
 
-      const checkEl = itemEl.querySelector('.feed-check');
       const syncStatusEl = document.getElementById('sync-status');
+      const prevDone = taskObj.done;
 
       taskObj.done = nextDone;
-      itemEl.classList.toggle('done', nextDone);
-      checkEl.textContent = nextDone ? '✓' : '';
+      renderTasks();
       syncStatusEl.textContent = 'SAVING';
 
       try {
@@ -1014,10 +1046,8 @@
         if (result.status !== 'ok') throw new Error('Update failed');
         syncStatusEl.textContent = 'SYNCED';
       } catch {
-        const rollbackDone = !nextDone;
-        taskObj.done = rollbackDone;
-        itemEl.classList.toggle('done', rollbackDone);
-        checkEl.textContent = rollbackDone ? '✓' : '';
+        taskObj.done = prevDone;
+        renderTasks();
         syncStatusEl.textContent = 'SAVE_ERR';
       }
     }
