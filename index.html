@@ -292,6 +292,70 @@
       margin-bottom: 2px;
     }
 
+    /* 업무 모드 전용 하단 예산 현황 플로팅 버튼 */
+    .budget-fab {
+      position: fixed;
+      bottom: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--green);
+      color: #000000;
+      border: none;
+      border-radius: 999px;
+      padding: 11px 24px;
+      font-size: 0.92rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35);
+      z-index: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .budget-fab:active {
+      transform: translateX(-50%) scale(0.96);
+    }
+    .budget-fab.hidden {
+      display: none;
+    }
+
+    /* 예산 현황 팝업 모달 */
+    #budget-overlay { z-index: 995; }
+    .budget-modal {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      width: 100%;
+      max-width: 1120px;
+      height: 90vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .budget-modal-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--card);
+    }
+    .budget-modal-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--green);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .budget-iframe {
+      width: 100%;
+      flex: 1;
+      border: none;
+      background: #f4f6f9;
+    }
+
     /* 메인 벤토 그리드 */
     .grid {
       display: grid;
@@ -660,6 +724,20 @@
     </div>
   </div>
 
+  <!-- 업무 모드 전용: 연구과제 예산 현황 팝업 모달 -->
+  <div id="budget-overlay" class="overlay hidden">
+    <div class="budget-modal">
+      <div class="budget-modal-header">
+        <span class="budget-modal-title">📊 연구과제 예산 및 집행 현황 대시보드</span>
+        <button type="button" class="cal-nav-btn" id="budget-close-btn">닫기 ✕</button>
+      </div>
+      <iframe id="budget-iframe" class="budget-iframe" title="연구과제 예산 현황 대시보드"></iframe>
+    </div>
+  </div>
+
+  <!-- 업무 모드 전용: 페이지 하단 예산 현황 버튼 -->
+  <button type="button" class="budget-fab hidden" id="open-budget-btn">📊 예산 현황</button>
+
   <!-- 대시보드 그리드 -->
   <div class="grid" id="dashboard-grid">
     <!-- 좌측 상단: 시계 & 날씨 -->
@@ -699,7 +777,7 @@
       </div>
     </div>
 
-    <!-- 좌측 하단: Google Tasks 할 일 (미완료/완료/전체 분류 + 항목 클릭 시 상세 팝업) -->
+    <!-- 좌측 하단: Google Tasks 할 일 -->
     <div class="card">
       <div class="card-title">
         <span>TASKS (<span id="task-count">0</span>)</span>
@@ -713,7 +791,7 @@
       <div class="list" id="task-list"></div>
     </div>
 
-    <!-- 우측 전체: SCHEDULE 클릭 시 앞뒤 2개월 달력 팝업 + 일정 클릭 시 상세 팝업 -->
+    <!-- 우측 전체: SCHEDULE -->
     <div class="card schedule-card">
       <div class="card-title">
         <span class="schedule-trigger" id="open-calendar-btn" title="클릭하여 앞뒤 2개월 달력 보기">
@@ -750,6 +828,331 @@
     let calViewYear = new Date().getFullYear();
     let calViewMonth = new Date().getMonth();
     let calSelectedDateStr = '';
+
+    /* ================= 0. 업무 모드 예산 현황 팝업 ================= */
+    const BUDGET_PAGE_HTML = `<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>연구과제 예산 현황 대시보드</title>
+  <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"><\/script>
+  <script type="text/javascript">
+    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwkkxTrwAlUCbx40yomgqIURytO3sHEe05FKcPrbGmVwkiz9yVElHx11qod02oPHsg0/exec';
+
+    google.charts.load('current', {'packages':['corechart']});
+    google.charts.setOnLoadCallback(initDashboard);
+
+    let globalData = null;
+    const CHART_COLORS = ['#9aa0a6', '#fbbc04'];
+
+    async function initDashboard() {
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(renderAll)
+          .withFailureHandler(err => alert('데이터 로드 오류: ' + err.message))
+          .getAllBudgetData();
+      } else {
+        try {
+          const res = await fetch(WEB_APP_URL + '?mode=json');
+          const data = await res.json();
+          renderAll(data);
+        } catch (err) {
+          alert('외부 데이터 로드 오류: ' + err.message);
+        }
+      }
+    }
+
+    function renderAll(data) {
+      globalData = data;
+      if (data.lastUpdated) {
+        document.getElementById('last_updated_badge').textContent = '시트 최종 수정일: ' + data.lastUpdated;
+      }
+      renderOverallSection(data.projectSummary, data.categorySummary);
+      populateProjectSelect(data.projectSummary);
+      drawProjectDetailCharts();
+    }
+
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        if (globalData) {
+          renderOverallSection(globalData.projectSummary, globalData.categorySummary);
+          drawProjectDetailCharts();
+        }
+      }, 200);
+    });
+
+    function formatKRW(num) {
+      return '₩' + Math.round(num).toLocaleString('ko-KR');
+    }
+
+    function createBudgetPieCard(container, title, budget, spent, balance, indexPrefix) {
+      const rate = budget > 0 ? ((spent / budget) * 100).toFixed(1) : '0.0';
+      const chartDivId = indexPrefix + '_pie';
+
+      const card = document.createElement('div');
+      card.className = 'item-pie-card';
+      card.innerHTML = \`
+        <div class="item-card-header">
+          <span class="item-title">\${title}</span>
+          <span class="item-rate-badge">\${rate}% 집행</span>
+        </div>
+        <div id="\${chartDivId}" class="item-chart-area"></div>
+        <div class="item-stats">
+          <div class="stat-row"><span>배정 예산</span><strong>\${formatKRW(budget)}</strong></div>
+          <div class="stat-row spent"><span>집행액</span><strong>\${formatKRW(spent)}</strong></div>
+          <div class="stat-row balance"><span>잔액</span><strong>\${formatKRW(balance)}</strong></div>
+        </div>
+      \`;
+      container.appendChild(card);
+
+      const formatter = new google.visualization.NumberFormat({ prefix: '₩', fractionDigits: 0 });
+      const pieData = google.visualization.arrayToDataTable([
+        ['구분', '금액'],
+        ['집행액', spent],
+        ['잔액', Math.max(0, balance)]
+      ]);
+      formatter.format(pieData, 1);
+
+      new google.visualization.PieChart(document.getElementById(chartDivId)).draw(pieData, {
+        pieHole: 0.42,
+        colors: CHART_COLORS,
+        pieSliceText: 'percentage',
+        pieSliceTextStyle: { color: '#202124', fontSize: 12, bold: true },
+        chartArea: { width: '90%', height: '82%' },
+        legend: { position: 'bottom', textStyle: { fontSize: 12 } },
+        tooltip: { text: 'both' }
+      });
+    }
+
+    function renderOverallSection(projects, categories) {
+      let totalBudget = 0, totalSpent = 0, totalBalance = 0;
+      projects.forEach(p => {
+        totalBudget += p.budget;
+        totalSpent += p.spent;
+        totalBalance += p.balance;
+      });
+
+      const rate = totalBudget > 0 ? ((totalSpent / totalBudget) * 100).toFixed(1) : '0.0';
+      const remainRate = totalBudget > 0 ? (100 - Number(rate)).toFixed(1) : '0.0';
+
+      document.getElementById('total_budget_val').textContent = formatKRW(totalBudget);
+      document.getElementById('total_spent_val').textContent = formatKRW(totalSpent);
+      document.getElementById('total_balance_val').textContent = formatKRW(totalBalance);
+      document.getElementById('total_rate_val').textContent = rate + '%';
+
+      document.getElementById('box_total_budget').textContent = formatKRW(totalBudget);
+      document.getElementById('box_total_spent').textContent = \`\${formatKRW(totalSpent)} (\${rate}%)\`;
+      document.getElementById('box_total_balance').textContent = \`\${formatKRW(totalBalance)} (\${remainRate}%)\`;
+
+      const formatter = new google.visualization.NumberFormat({ prefix: '₩', fractionDigits: 0 });
+      const overallPieData = google.visualization.arrayToDataTable([
+        ['구분', '금액'],
+        ['전체 집행액', totalSpent],
+        ['전체 잔액', Math.max(0, totalBalance)]
+      ]);
+      formatter.format(overallPieData, 1);
+
+      new google.visualization.PieChart(document.getElementById('overall_all_pie')).draw(overallPieData, {
+        pieHole: 0.45,
+        colors: CHART_COLORS,
+        pieSliceText: 'percentage',
+        pieSliceTextStyle: { color: '#202124', fontSize: 14, bold: true },
+        chartArea: { width: '90%', height: '82%' },
+        legend: { position: 'bottom', textStyle: { fontSize: 13 } },
+        tooltip: { text: 'both' }
+      });
+
+      const overallCatContainer = document.getElementById('overall_category_pies_container');
+      overallCatContainer.innerHTML = '';
+      categories.forEach((cat, idx) => {
+        if (cat.budget > 0) {
+          createBudgetPieCard(overallCatContainer, cat.category, cat.budget, cat.spent, cat.balance, 'overall_cat_' + idx);
+        }
+      });
+    }
+
+    function populateProjectSelect(projects) {
+      const select = document.getElementById('projectSelect');
+      if (select.options.length > 0) return;
+      projects.forEach(p => {
+        const option = document.createElement('option');
+        option.value = p.projectNo;
+        option.textContent = \`[\${p.projectNo}] \${p.projectName}\`;
+        select.appendChild(option);
+      });
+    }
+
+    function drawProjectDetailCharts() {
+      const selectedNo = document.getElementById('projectSelect').value;
+      const selectedProj = globalData.projectSummary.find(p => p.projectNo === selectedNo);
+
+      if (selectedProj) {
+        const rate = selectedProj.budget > 0 ? ((selectedProj.spent / selectedProj.budget) * 100).toFixed(1) : '0.0';
+        document.getElementById('sel_budget_val').textContent = formatKRW(selectedProj.budget);
+        document.getElementById('sel_spent_val').textContent = formatKRW(selectedProj.spent);
+        document.getElementById('sel_balance_val').textContent = formatKRW(selectedProj.balance);
+        document.getElementById('sel_rate_val').textContent = rate + '%';
+      }
+
+      const filtered = globalData.detailList.filter(d => d.projectNo === selectedNo && d.budget > 0);
+      const container = document.getElementById('category_pies_container');
+      container.innerHTML = '';
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div style="grid-column: 1 / -1; text-align:center; padding:40px; background:white; border-radius:8px; color:#666;">배정된 예산 항목이 없습니다.</div>';
+        return;
+      }
+
+      filtered.forEach((item, index) => {
+        createBudgetPieCard(container, item.category, item.budget, item.spent, item.balance, 'proj_cat_' + index);
+      });
+    }
+  <\/script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Malgun Gothic', -apple-system, BlinkMacSystemFont, sans-serif; margin: 16px; background-color: #f4f6f9; color: #202124; }
+    .header-area { text-align: center; margin-bottom: 24px; }
+    .header-area h2 { margin: 0 0 8px 0; font-size: 22px; word-break: keep-all; }
+    .updated-badge { display: inline-block; background-color: #e8eaed; color: #3c4043; font-size: 12px; font-weight: bold; padding: 5px 14px; border-radius: 16px; }
+    .container { max-width: 1240px; margin: 0 auto; }
+    .section-title { margin: 28px 0 14px; font-size: 18px; font-weight: bold; border-left: 4px solid #fbbc04; padding-left: 10px; word-break: keep-all; }
+    .sub-section-title { margin: 22px 0 12px; font-size: 15px; font-weight: bold; color: #3c4043; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+    .kpi-card { background: white; border-radius: 8px; padding: 16px 18px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); border-top: 4px solid #dadce0; }
+    .kpi-card.budget { border-top-color: #202124; }
+    .kpi-card.spent { border-top-color: #9aa0a6; }
+    .kpi-card.balance { border-top-color: #fbbc04; }
+    .kpi-card.rate { border-top-color: #1a73e8; }
+    .kpi-label { font-size: 12px; color: #5f6368; margin-bottom: 6px; font-weight: bold; }
+    .kpi-value { font-size: 20px; font-weight: bold; color: #202124; word-break: break-all; }
+    .kpi-card.spent .kpi-value { color: #5f6368; }
+    .kpi-card.balance .kpi-value { color: #d97706; }
+    .overall-pie-box { background: white; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); padding: 18px 20px; margin-bottom: 24px; }
+    .overall-pie-header { font-size: 16px; font-weight: bold; color: #202124; margin-bottom: 14px; border-bottom: 1px solid #f1f3f4; padding-bottom: 10px; }
+    .overall-pie-content { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+    #overall_all_pie { flex: 1; min-width: 280px; width: 100%; height: 300px; }
+    .overall-summary-panel { flex: 1; min-width: 280px; width: 100%; background: #f8f9fa; border-radius: 10px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; border: 1px solid #e8eaed; }
+    .summary-line { display: flex; justify-content: space-between; align-items: center; font-size: 15px; padding-bottom: 12px; border-bottom: 1px solid #e8eaed; gap: 8px; }
+    .summary-line:last-child { border-bottom: none; padding-bottom: 0; }
+    .summary-line .label { font-weight: bold; color: #3c4043; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .dot.budget { background-color: #202124; }
+    .dot.spent { background-color: #9aa0a6; }
+    .dot.balance { background-color: #fbbc04; }
+    .summary-line .val { font-size: 17px; font-weight: bold; text-align: right; }
+    .summary-line.budget .val { color: #202124; }
+    .summary-line.spent .val { color: #5f6368; }
+    .summary-line.balance .val { color: #d97706; }
+    .filter-bar { background: white; padding: 14px 16px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.08); display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .filter-bar label { white-space: nowrap; font-size: 14px; }
+    select { padding: 10px 12px; font-size: 14px; border: 1px solid #dadce0; border-radius: 6px; width: 100%; max-width: 800px; background-color: #fff; }
+    .item-pies-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 10px; }
+    .item-pie-card { background: white; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); padding: 16px; display: flex; flex-direction: column; }
+    .item-card-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f3f4; padding-bottom: 10px; margin-bottom: 8px; }
+    .item-title { font-size: 15px; font-weight: bold; color: #202124; }
+    .item-rate-badge { background: #f1f3f4; color: #5f6368; font-size: 12px; font-weight: bold; padding: 4px 8px; border-radius: 12px; white-space: nowrap; }
+    .item-chart-area { width: 100%; height: 230px; }
+    .item-stats { margin-top: 8px; padding-top: 10px; border-top: 1px solid #f1f3f4; font-size: 13px; display: flex; flex-direction: column; gap: 5px; }
+    .stat-row { display: flex; justify-content: space-between; color: #5f6368; }
+    .stat-row strong { color: #202124; }
+    .stat-row.spent strong { color: #5f6368; }
+    .stat-row.balance strong { color: #d97706; }
+    @media (max-width: 960px) {
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      .item-pies-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 600px) {
+      body { margin: 12px; }
+      .header-area h2 { font-size: 19px; }
+      .section-title { font-size: 16px; margin-top: 24px; }
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+      .kpi-card { padding: 14px 12px; }
+      .kpi-value { font-size: 16px; }
+      .overall-pie-box { padding: 16px 14px; }
+      #overall_all_pie { min-width: 100%; height: 250px; }
+      .overall-summary-panel { min-width: 100%; padding: 14px 16px; }
+      .summary-line { font-size: 14px; }
+      .summary-line .val { font-size: 15px; }
+      .filter-bar { flex-direction: column; align-items: stretch; gap: 8px; }
+      .item-pies-grid { grid-template-columns: 1fr; gap: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header-area">
+      <h2>연구과제 예산 및 집행 현황 대시보드</h2>
+      <div class="updated-badge" id="last_updated_badge">데이터 불러오는 중...</div>
+    </div>
+
+    <div class="section-title">1. 전체 연구과제 예산 총괄 (모든 과제 합산)</div>
+    <div class="kpi-grid">
+      <div class="kpi-card budget"><div class="kpi-label">전체 총 예산</div><div class="kpi-value" id="total_budget_val">₩0</div></div>
+      <div class="kpi-card spent"><div class="kpi-label">전체 집행액</div><div class="kpi-value" id="total_spent_val">₩0</div></div>
+      <div class="kpi-card balance"><div class="kpi-label">전체 잔액</div><div class="kpi-value" id="total_balance_val">₩0</div></div>
+      <div class="kpi-card rate"><div class="kpi-label">전체 집행률</div><div class="kpi-value" id="total_rate_val">0.0%</div></div>
+    </div>
+
+    <div class="overall-pie-box">
+      <div class="overall-pie-header">전체 예산 집행 비율 (모든 과제 합산)</div>
+      <div class="overall-pie-content">
+        <div id="overall_all_pie"></div>
+        <div class="overall-summary-panel">
+          <div class="summary-line budget"><span class="label"><span class="dot budget"></span>전체 총 예산</span><span class="val" id="box_total_budget">₩0</span></div>
+          <div class="summary-line spent"><span class="label"><span class="dot spent"></span>전체 집행액</span><span class="val" id="box_total_spent">₩0 (0.0%)</span></div>
+          <div class="summary-line balance"><span class="label"><span class="dot balance"></span>전체 잔액</span><span class="val" id="box_total_balance">₩0 (0.0%)</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub-section-title">항목별 전체 과제 합산 현황</div>
+    <div id="overall_category_pies_container" class="item-pies-grid"></div>
+
+    <div class="section-title">2. 과제별 상세 예산 및 항목별 집행 현황</div>
+    <div class="filter-bar">
+      <label for="projectSelect"><strong>조회할 과제 선택:</strong></label>
+      <select id="projectSelect" onchange="drawProjectDetailCharts()"></select>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card budget"><div class="kpi-label">선택 과제 예산</div><div class="kpi-value" id="sel_budget_val">₩0</div></div>
+      <div class="kpi-card spent"><div class="kpi-label">선택 과제 집행액</div><div class="kpi-value" id="sel_spent_val">₩0</div></div>
+      <div class="kpi-card balance"><div class="kpi-label">선택 과제 잔액</div><div class="kpi-value" id="sel_balance_val">₩0</div></div>
+      <div class="kpi-card rate"><div class="kpi-label">선택 과제 집행률</div><div class="kpi-value" id="sel_rate_val">0.0%</div></div>
+    </div>
+
+    <div id="category_pies_container" class="item-pies-grid"></div>
+  </div>
+</body>
+</html>`;
+
+    const budgetFab = document.getElementById('open-budget-btn');
+    const budgetOverlay = document.getElementById('budget-overlay');
+    const budgetIframe = document.getElementById('budget-iframe');
+
+    function updateBudgetFabVisibility() {
+      budgetFab.classList.toggle('hidden', selectedGroup !== '업무');
+    }
+
+    budgetFab.addEventListener('click', () => {
+      budgetIframe.srcdoc = BUDGET_PAGE_HTML;
+      budgetOverlay.classList.remove('hidden');
+    });
+
+    document.getElementById('budget-close-btn').addEventListener('click', () => {
+      budgetOverlay.classList.add('hidden');
+      budgetIframe.srcdoc = '';
+    });
+
+    budgetOverlay.addEventListener('click', (e) => {
+      if (e.target === budgetOverlay) {
+        budgetOverlay.classList.add('hidden');
+        budgetIframe.srcdoc = '';
+      }
+    });
 
     /* ================= 1. 최초 1회 페어링 ================= */
     const pairingOverlay = document.getElementById('pairing-overlay');
@@ -934,7 +1337,6 @@
       const startDate = new Date(calViewYear, calViewMonth, 1 - startOffset);
       const todayStr = formatYmd(today);
 
-      // 현재 상단 필터(전체/개인/업무)를 달력에도 그대로 반영
       const filteredCalEvents = selectedGroup === 'ALL'
         ? cachedEvents
         : cachedEvents.filter(ev => ev.group === selectedGroup);
@@ -977,7 +1379,6 @@
         gridEl.appendChild(cell);
       }
 
-      // 선택된 날짜의 일정 목록 하단 렌더링
       const detailListEl = document.getElementById('cal-day-events');
       const selectedEvents = filteredCalEvents.filter(ev => ev.dateStr === calSelectedDateStr);
       document.getElementById('cal-selected-date-title').textContent =
@@ -1358,7 +1759,6 @@
           div.innerHTML = `<div class="item-time"></div><div class="item-title"></div>`;
           div.querySelector('.item-time').textContent = `${ev.time} · ${ev.group} / ${ev.category}`;
           div.querySelector('.item-title').textContent = ev.title;
-          // 일정 클릭 시 상세 내용 팝업
           div.addEventListener('click', () => openEventDetail(ev));
           scheduleEl.appendChild(div);
         });
@@ -1410,7 +1810,6 @@
         div.querySelector('.feed-tag').textContent = t.listTitle;
         div.querySelector('.feed-text').textContent = t.title;
 
-        // 체크박스 터치 시 즉시 완료 토글, 행 본문 터치 시 세부내역 팝업
         const checkBtn = div.querySelector('.feed-check');
         if (t.taskId && t.listId) {
           checkBtn.addEventListener('click', (e) => {
@@ -1441,6 +1840,7 @@
         selectedCategory = 'ALL';
         currentDdayIndex = 0;
 
+        updateBudgetFabVisibility();
         renderSubCategories();
         renderSchedules();
         renderTasks();
@@ -1576,6 +1976,7 @@
     /* ================= 10. 초기화 실행 ================= */
     initPairing();
     updateClock();
+    updateBudgetFabVisibility();
     renderDday();
     fetchWeather();
     fetchDashboardData();
