@@ -125,7 +125,7 @@
     /* 상세 정보 모달 스타일 */
     .detail-box {
       text-align: left;
-      max-width: 440px;
+      max-width: 460px;
     }
     .detail-header {
       display: flex;
@@ -178,16 +178,17 @@
       font-style: italic;
     }
 
-    /* 월간 달력 팝업 모달 */
-    #calendar-overlay { z-index: 990; }
+    /* 월간 달력 팝업 모달 (대형 화면 유지) */
+    #calendar-overlay { z-index: 990; padding: 12px; }
     .cal-modal {
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 22px;
-      padding: 20px;
+      padding: 22px;
       width: 100%;
-      max-width: 780px;
-      max-height: 92dvh;
+      max-width: 1080px;
+      height: 94dvh;
+      max-height: 94dvh;
       display: flex;
       flex-direction: column;
       gap: 12px;
@@ -197,26 +198,27 @@
       justify-content: space-between;
       align-items: center;
       gap: 8px;
+      flex-shrink: 0;
     }
     .cal-nav {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       flex-wrap: wrap;
     }
     .cal-month-title {
-      font-size: 1.1rem;
+      font-size: 1.25rem;
       font-weight: 700;
-      min-width: 105px;
+      min-width: 120px;
       text-align: center;
     }
     .cal-nav-btn {
       background: var(--sub-card);
       border: 1px solid var(--border);
       color: var(--text-main);
-      padding: 6px 11px;
-      border-radius: 8px;
-      font-size: 0.8rem;
+      padding: 7px 13px;
+      border-radius: 9px;
+      font-size: 0.84rem;
       font-weight: 600;
       cursor: pointer;
       white-space: nowrap;
@@ -229,27 +231,31 @@
       display: grid;
       grid-template-columns: repeat(7, 1fr);
       text-align: center;
-      font-size: 0.75rem;
+      font-size: 0.8rem;
       font-weight: 600;
       color: var(--text-sub);
+      flex-shrink: 0;
     }
     .cal-weekdays span:first-child { color: var(--danger); }
     .cal-weekdays span:last-child { color: var(--accent); }
     .cal-grid {
       display: grid;
       grid-template-columns: repeat(7, 1fr);
-      gap: 4px;
+      grid-template-rows: repeat(6, 1fr);
+      gap: 6px;
+      flex: 1.4;
+      min-height: 0;
     }
     .cal-day {
       background: var(--sub-card);
       border: 1px solid transparent;
-      border-radius: 10px;
-      min-height: 58px;
-      padding: 5px 6px;
+      border-radius: 11px;
+      min-height: 76px;
+      padding: 6px 8px;
       cursor: pointer;
       display: flex;
       flex-direction: column;
-      gap: 3px;
+      gap: 4px;
       overflow: hidden;
       transition: border-color 0.15s;
     }
@@ -263,16 +269,16 @@
       background: #24242a;
     }
     .cal-day-num {
-      font-size: 0.76rem;
-      font-weight: 600;
+      font-size: 0.82rem;
+      font-weight: 700;
       color: var(--text-main);
     }
     .cal-day:nth-child(7n+1) .cal-day-num { color: #f87171; }
     .cal-day:nth-child(7n) .cal-day-num { color: #60a5fa; }
     .cal-ev-pill {
-      font-size: 0.64rem;
-      padding: 1px 4px;
-      border-radius: 4px;
+      font-size: 0.7rem;
+      padding: 2px 5px;
+      border-radius: 5px;
       color: #fff;
       white-space: nowrap;
       overflow: hidden;
@@ -280,20 +286,22 @@
       font-weight: 500;
     }
     .cal-more {
-      font-size: 0.62rem;
+      font-size: 0.66rem;
       color: var(--text-sub);
     }
     .cal-day-detail {
       border-top: 1px solid var(--border);
       padding-top: 10px;
-      max-height: 155px;
+      flex: 0.6;
+      min-height: 140px;
+      max-height: 210px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
       gap: 6px;
     }
     .cal-day-detail-title {
-      font-size: 0.8rem;
+      font-size: 0.84rem;
       font-weight: 600;
       color: var(--text-sub);
       margin-bottom: 2px;
@@ -347,7 +355,7 @@
       border-radius: 22px;
       width: 100%;
       max-width: 1120px;
-      height: 90dvh;
+      height: 92dvh;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -388,7 +396,8 @@
       border-radius: 22px;
       padding: 20px;
       width: 100%;
-      max-width: 640px;
+      max-width: 680px;
+      height: 88dvh;
       max-height: 88dvh;
       display: flex;
       flex-direction: column;
@@ -843,26 +852,28 @@
       .mini-btn { padding: 5px 8px; font-size: 0.72rem; }
       .filter-btn { padding: 5px 9px; font-size: 0.74rem; }
 
-      /* 달력 팝업 모바일 최적화 */
+      /* 달력 팝업 모바일 대형 유지 */
       .cal-modal {
         padding: 14px;
         border-radius: 18px;
-        max-height: 92dvh;
+        height: 94dvh;
+        max-height: 94dvh;
       }
       .cal-month-title {
-        font-size: 0.98rem;
-        min-width: 88px;
+        font-size: 1rem;
+        min-width: 90px;
       }
       .cal-nav { gap: 5px; }
       .cal-nav-btn { padding: 5px 8px; font-size: 0.74rem; }
+      .cal-grid { gap: 3px; }
       .cal-day {
-        min-height: 46px;
-        padding: 3px 4px;
+        min-height: 54px;
+        padding: 4px;
         border-radius: 8px;
       }
-      .cal-day-num { font-size: 0.72rem; }
-      .cal-ev-pill { font-size: 0.58rem; padding: 1px 3px; }
-      .cal-day-detail { max-height: 135px; }
+      .cal-day-num { font-size: 0.74rem; }
+      .cal-ev-pill { font-size: 0.6rem; padding: 1px 3px; }
+      .cal-day-detail { max-height: 150px; }
 
       /* 예산 현황 & 연구비 카드 모바일 최적화 */
       .budget-modal {
@@ -874,6 +885,7 @@
       .cards-modal {
         padding: 16px;
         border-radius: 18px;
+        height: 88dvh;
       }
       .card-search-select { width: 102px; font-size: 14px; padding: 9px 8px; }
       .work-fab-bar {
@@ -895,9 +907,9 @@
   <!-- 최초 1회 페어링 모달 -->
   <div id="pairing-overlay" class="overlay hidden">
     <div class="modal-box">
-      <h2>기기 최초 페어링</h2>
-      <p>페어링 QR 코드를 스캔하거나<br>발급받은 ACCESS_TOKEN을 입력하세요.</p>
-      <input type="password" id="token-input" placeholder="64자리 토큰 입력" autocomplete="off" />
+      <h2>기기 최초 연결</h2>
+      <p>설정하신 접속 비밀번호를 입력하세요.</p>
+      <input type="password" id="token-input" placeholder="비밀번호 입력" autocomplete="off" />
       <div class="modal-actions">
         <button class="primary-btn" id="pair-submit">기기 연결</button>
       </div>
@@ -941,7 +953,7 @@
     </div>
   </div>
 
-  <!-- 월간 달력 팝업 모달 (앞뒤 2개월) -->
+  <!-- 월간 달력 팝업 모달 (앞뒤 2개월, 대형 유지) -->
   <div id="calendar-overlay" class="overlay hidden">
     <div class="cal-modal">
       <div class="cal-header">
@@ -1108,7 +1120,7 @@
   <script>
     const GAS_ENDPOINT = "%%GAS_ENDPOINT%%";
     const STORAGE_KEY = "DESK_PAIRED_TOKEN";
-    const DATA_CACHE_KEY = "DESK_DATA_CACHE_V1";
+    const DATA_CACHE_KEY = "DESK_DATA_CACHE_V2";
     const WEATHER_CACHE_KEY = "DESK_WEATHER_CACHE_V1";
 
     let cachedEvents = [];
@@ -1731,7 +1743,7 @@
       if (e.target === detailOverlay) detailOverlay.classList.add('hidden');
     });
 
-    /* ================= 5. 월간 달력 팝업 (오늘 기준 앞뒤 2개월) ================= */
+    /* ================= 5. 월간 달력 팝업 (오늘 기준 앞뒤 2개월, 대형 유지) ================= */
     const calendarOverlay = document.getElementById('calendar-overlay');
 
     function formatYmd(dateObj) {
@@ -1789,17 +1801,17 @@
         cell.appendChild(numEl);
 
         const dayEvents = filteredCalEvents.filter(ev => ev.dateStr === cellStr);
-        dayEvents.slice(0, 2).forEach(ev => {
+        dayEvents.slice(0, 3).forEach(ev => {
           const pill = document.createElement('div');
           pill.className = 'cal-ev-pill';
           pill.style.backgroundColor = ev.color || '#3b82f6';
           pill.textContent = ev.title;
           cell.appendChild(pill);
         });
-        if (dayEvents.length > 2) {
+        if (dayEvents.length > 3) {
           const moreEl = document.createElement('div');
           moreEl.className = 'cal-more';
-          moreEl.textContent = `+${dayEvents.length - 2}개`;
+          moreEl.textContent = `+${dayEvents.length - 3}개`;
           cell.appendChild(moreEl);
         }
 
@@ -2133,9 +2145,16 @@
     function getUpcomingEvents() {
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
+      const todayStr = formatYmd(todayStart);
       const startMs = todayStart.getTime();
       const endMs = startMs + 31 * 24 * 60 * 60 * 1000;
-      return cachedEvents.filter(ev => ev.startMs >= startMs && ev.startMs <= endMs);
+
+      // 우측 리스트에서는 연속 일정 중복 제거 (오늘 날짜 또는 시작일 1회만 표시)
+      return cachedEvents.filter(ev => {
+        if (ev.startMs < startMs || ev.startMs > endMs) return false;
+        if (ev.isContinuation && ev.dateStr !== todayStr) return false;
+        return true;
+      });
     }
 
     function renderSubCategories() {
@@ -2367,7 +2386,7 @@
           cachedDdays = [];
           cachedCards = [];
           renderAllWidgets();
-          showPairingScreen('유효하지 않거나 만료된 토큰입니다. 다시 페어링하세요.');
+          showPairingScreen('유효하지 않거나 만료된 비밀번호입니다. 다시 입력하세요.');
           return;
         }
         if (data.status === 'blocked') {
@@ -2443,7 +2462,7 @@
     });
 
     document.getElementById('unpair-btn').addEventListener('click', () => {
-      if (confirm('이 기기의 페어링을 해제할까요?')) {
+      if (confirm('이 기기의 연결을 해제할까요?')) {
         localStorage.removeItem(STORAGE_KEY);
         localStorage.removeItem(DATA_CACHE_KEY);
         cachedEvents = [];
@@ -2451,7 +2470,7 @@
         cachedDdays = [];
         cachedCards = [];
         renderAllWidgets();
-        showPairingScreen('페어링이 해제되었습니다.');
+        showPairingScreen('연결이 해제되었습니다.');
       }
     });
 
