@@ -1,0 +1,19 @@
+{
+  "name": "Desk Dashboard",
+  "short_name": "Dashboard",
+  "description": "개인 및 업무 통합 데스크 대시보드",
+  "start_url": "/dashboard/",
+  "scope": "/dashboard/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%23121214'/%3E%3Crect x='56' y='56' width='180' height='180' rx='36' fill='%233b82f6'/%3E%3Crect x='276' y='56' width='180' height='400' rx='36' fill='%2310b981'/%3E%3Crect x='56' y='276' width='180' height='180' rx='36' fill='%2327272a'/%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
