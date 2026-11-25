@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://script.google.com" crossorigin />
   <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin />
   <link rel="preconnect" href="https://api.open-meteo.com" crossorigin />
+  <link rel="preconnect" href="https://open.er-api.com" crossorigin />
   <style>
     :root {
       --bg: #000000;
@@ -178,7 +179,7 @@
       font-style: italic;
     }
 
-    /* 월간 달력 팝업 모달 (좌측 대형 달력 + 우측 상세 일정 + 카테고리 필터) */
+    /* 월간 달력 팝업 모달 */
     #calendar-overlay { z-index: 990; padding: 10px; }
     .cal-modal {
       background: var(--card);
@@ -566,7 +567,7 @@
     .grid {
       display: grid;
       grid-template-columns: 1.15fr 1.35fr;
-      grid-template-rows: 1.05fr 0.65fr 1.15fr;
+      grid-template-rows: 1.02fr 0.78fr 1.05fr;
       gap: 14px;
       height: 100%;
     }
@@ -574,7 +575,7 @@
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 20px;
-      padding: 20px;
+      padding: 18px 20px;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -589,6 +590,7 @@
       justify-content: space-between;
       align-items: center;
       gap: 6px;
+      flex-shrink: 0;
     }
     .mini-btn {
       background: transparent;
@@ -615,23 +617,65 @@
       margin-right: 6px;
     }
 
-    /* 1. 시계 & 날씨 */
-    .clock-time { font-size: 4.1rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1.05; }
-    .clock-date { font-size: 1.05rem; color: var(--text-sub); margin-top: 6px; }
+    /* 1. 시계 + 우측 환율(USD/KRW, JPY/KRW, CNY/KRW) + 날씨 */
+    .clock-fx-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      margin: auto 0;
+    }
+    .clock-left {
+      min-width: 0;
+    }
+    .clock-time { font-size: 3.8rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1.02; }
+    .clock-date { font-size: 1rem; color: var(--text-sub); margin-top: 6px; }
+    .fx-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: var(--sub-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px 13px;
+      min-width: 162px;
+      flex-shrink: 0;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .fx-panel:hover { border-color: #3f3f46; }
+    .fx-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 10px;
+      font-size: 0.82rem;
+    }
+    .fx-pair {
+      color: var(--text-sub);
+      font-weight: 700;
+      font-size: 0.74rem;
+      letter-spacing: 0.02em;
+    }
+    .fx-val {
+      color: var(--text-main);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      font-size: 0.86rem;
+    }
     .weather-box {
       margin-top: auto;
-      padding-top: 14px;
+      padding-top: 12px;
       border-top: 1px solid var(--border);
       display: flex;
       align-items: baseline;
       justify-content: space-between;
     }
-    .temp { font-size: 2rem; font-weight: 600; }
-    .weather-desc { color: var(--text-sub); font-size: 0.95rem; }
+    .temp { font-size: 1.85rem; font-weight: 600; }
+    .weather-desc { color: var(--text-sub); font-size: 0.92rem; }
 
-    /* 2. D-Day 단독 카드 */
+    /* 2. D-Day 좌우 분할 카드 (좌: 제일 최근 D-Day / 우: 전체 D-Day 목록) */
     .dday-card {
-      cursor: pointer;
       justify-content: space-between;
       user-select: none;
     }
@@ -640,21 +684,42 @@
       align-items: center;
       gap: 5px;
     }
-    .dday-main {
+    .dday-split {
+      display: flex;
+      align-items: stretch;
+      gap: 14px;
+      flex: 1;
+      min-height: 0;
+    }
+    .dday-left {
+      flex: 0.95;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 6px;
+      padding-right: 12px;
+      border-right: 1px solid var(--border);
+    }
+    .dday-left-top {
       display: flex;
       align-items: baseline;
       justify-content: space-between;
-      gap: 12px;
-      margin: auto 0;
+      gap: 8px;
     }
     .dday-count {
-      font-size: 2.3rem;
+      font-size: 2.25rem;
       font-weight: 700;
       color: var(--accent);
-      flex-shrink: 0;
+      line-height: 1.05;
     }
     .dday-count.today { color: var(--green); }
     .dday-count.past { color: var(--text-sub); }
+    .dday-left-date {
+      font-size: 0.8rem;
+      color: var(--text-sub);
+      font-weight: 600;
+    }
     .dday-label-wrap {
       display: flex;
       align-items: center;
@@ -675,13 +740,63 @@
       color: var(--green);
     }
     .dday-label {
-      font-size: 1rem;
-      font-weight: 500;
+      font-size: 0.96rem;
+      font-weight: 600;
       color: var(--text-main);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
+    .dday-right {
+      flex: 1.15;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-right: 2px;
+    }
+    .dday-list-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 9px;
+      border-radius: 8px;
+      background: var(--sub-card);
+      border: 1px solid transparent;
+      cursor: pointer;
+      font-size: 0.82rem;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .dday-list-row:hover { background: #222227; }
+    .dday-list-row.selected {
+      border-color: var(--accent);
+      background: rgba(59, 130, 246, 0.12);
+    }
+    .dday-list-row-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      flex: 1;
+    }
+    .dday-list-title {
+      color: var(--text-main);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-weight: 500;
+    }
+    .dday-list-badge {
+      font-weight: 700;
+      font-size: 0.78rem;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+    .dday-list-badge.today { color: var(--green); }
+    .dday-list-badge.past { color: var(--text-sub); }
 
     /* 3. Google Tasks 할 일 */
     .task-controls {
@@ -872,17 +987,46 @@
         max-height: 460px;
       }
 
-      /* 시계 & 날씨 모바일 컴팩트 배치 */
-      .clock-time { font-size: 3.1rem; }
-      .clock-date { font-size: 0.94rem; margin-top: 4px; }
-      .weather-box { margin-top: 12px; padding-top: 10px; }
-      .temp { font-size: 1.6rem; }
+      /* 시계 & 환율 모바일 가로 3열 배치 */
+      .clock-fx-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+      }
+      .clock-time { font-size: 3rem; }
+      .clock-date { font-size: 0.92rem; margin-top: 4px; }
+      .fx-panel {
+        flex-direction: row;
+        justify-content: space-between;
+        min-width: 0;
+        padding: 9px 10px;
+        gap: 6px;
+      }
+      .fx-row {
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        flex: 1;
+      }
+      .weather-box { margin-top: 10px; padding-top: 10px; }
+      .temp { font-size: 1.55rem; }
       .weather-desc { font-size: 0.88rem; }
 
-      /* D-Day 모바일 크기 최적화 */
-      .dday-main { margin: 6px 0 0 0; }
+      /* D-Day 모바일 상하 분할 */
+      .dday-split {
+        flex-direction: column;
+        gap: 10px;
+      }
+      .dday-left {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        padding-right: 0;
+        padding-bottom: 10px;
+      }
       .dday-count { font-size: 1.9rem; }
-      .dday-label { font-size: 0.94rem; }
+      .dday-right {
+        max-height: 150px;
+      }
 
       /* 카드 헤더 줄바꿈 대응 */
       .card-title { flex-wrap: wrap; row-gap: 6px; }
@@ -1016,7 +1160,6 @@
         </div>
         <button type="button" class="cal-nav-btn" id="cal-close-btn">닫기 ✕</button>
       </div>
-      <!-- 달력 팝업 내 그룹 & 카테고리 선택 바 -->
       <div class="cal-filter-row">
         <div class="filter-group" id="cal-group-filters">
           <button type="button" class="filter-btn active" data-group="ALL">전체</button>
@@ -1112,7 +1255,7 @@
 
   <!-- 대시보드 그리드 -->
   <div class="grid" id="dashboard-grid">
-    <!-- 좌측 상단: 시계 & 날씨 -->
+    <!-- 좌측 상단: 시계 + 우측 환율(USD/KRW, JPY/KRW, CNY/KRW) + 날씨 -->
     <div class="card">
       <div class="card-title">
         <span>SEOUL, KR</span>
@@ -1121,31 +1264,56 @@
           <button class="mini-btn" id="unpair-btn">UNPAIR</button>
         </div>
       </div>
-      <div class="clock-time" id="clock">00:00</div>
-      <div class="clock-date" id="date">----년 --월 --일</div>
+      <div class="clock-fx-row">
+        <div class="clock-left">
+          <div class="clock-time" id="clock">00:00</div>
+          <div class="clock-date" id="date">----년 --월 --일</div>
+        </div>
+        <div class="fx-panel" id="fx-widget" title="터치하여 실시간 환율 새로고침">
+          <div class="fx-row">
+            <span class="fx-pair">USD/KRW</span>
+            <span class="fx-val" id="fx-usd">--</span>
+          </div>
+          <div class="fx-row">
+            <span class="fx-pair">JPY/KRW</span>
+            <span class="fx-val" id="fx-jpy">--</span>
+          </div>
+          <div class="fx-row">
+            <span class="fx-pair">CNY/KRW</span>
+            <span class="fx-val" id="fx-cny">--</span>
+          </div>
+        </div>
+      </div>
       <div class="weather-box">
         <span class="temp" id="temp">--°</span>
         <span class="weather-desc" id="weather-desc">날씨 불러오는 중...</span>
       </div>
     </div>
 
-    <!-- 좌측 중단: D-Day 단독 위젯 -->
-    <div class="card dday-card" id="dday-widget" title="터치하여 다음 D-Day 보기">
+    <!-- 좌측 중단: D-Day 반반 분할 위젯 (좌: 제일 최근 D-Day / 우: 전체 D-Day 목록) -->
+    <div class="card dday-card" id="dday-widget">
       <div class="card-title">
         <span>D-DAY <span id="dday-index-badge"></span></span>
         <div class="dday-actions">
-          <span id="dday-target-date" style="margin-right: 2px;">--.--</span>
           <button type="button" class="mini-btn" id="dday-past-toggle" title="이미 지난 D+ 항목 표시 전환">지난일정</button>
           <button type="button" class="mini-btn" id="dday-edit-btn">수정</button>
           <button type="button" class="mini-btn accent" id="dday-add-btn">+</button>
         </div>
       </div>
-      <div class="dday-main">
-        <span class="dday-count" id="dday-count">D-?</span>
-        <div class="dday-label-wrap">
-          <span class="dday-group-badge" id="dday-group-badge" style="display:none;">개인</span>
-          <span class="dday-label" id="dday-label">불러오는 중...</span>
+      <div class="dday-split">
+        <!-- 좌측: 가장 임박한(또는 선택된) D-Day 강조 -->
+        <div class="dday-left">
+          <div class="dday-left-top">
+            <span class="dday-count" id="dday-count">D-?</span>
+            <span class="dday-left-date" id="dday-target-date">--.--</span>
+          </div>
+          <div class="dday-label-wrap">
+            <span class="dday-group-badge" id="dday-group-badge" style="display:none;">개인</span>
+            <span class="dday-label" id="dday-label">불러오는 중...</span>
+          </div>
         </div>
+        <!-- 우측: D-Day 전체 목록 -->
+        <div class="dday-right" id="dday-list-container"></div>
       </div>
     </div>
 
@@ -1186,6 +1354,7 @@
     const STORAGE_KEY = "DESK_PAIRED_TOKEN";
     const DATA_CACHE_KEY = "DESK_DATA_CACHE_V2";
     const WEATHER_CACHE_KEY = "DESK_WEATHER_CACHE_V1";
+    const FX_CACHE_KEY = "DESK_FX_CACHE_V2";
 
     let cachedEvents = [];
     let cachedTasks = [];
@@ -1199,7 +1368,7 @@
     let selectedCategory = 'ALL';
     let selectedTaskStatus = 'TODO';
 
-    // 달력 팝업 상태 (독립 그룹/카테고리 필터 지원)
+    // 달력 팝업 상태
     let calViewYear = new Date().getFullYear();
     let calViewMonth = new Date().getMonth();
     let calSelectedDateStr = '';
@@ -1707,7 +1876,7 @@
       document.body.style.transform = `translate(${x}px, ${y}px)`;
     }
 
-    /* ================= 3. 시계 & 야간 디밍 ================= */
+    /* ================= 3. 시계 & 야간 디밍 & 실시간 환율 ================= */
     function updateClock() {
       const now = new Date();
       const h = now.getHours();
@@ -1723,6 +1892,52 @@
       document.body.classList.toggle('night-mode', h >= 23 || h < 6);
       if (h === 4 && m === 0 && s === 0) location.reload();
     }
+
+    function applyFxDisplay(fxObj) {
+      if (!fxObj) return;
+      if (fxObj.usd) document.getElementById('fx-usd').textContent = fxObj.usd;
+      if (fxObj.jpy) document.getElementById('fx-jpy').textContent = fxObj.jpy;
+      if (fxObj.cny) document.getElementById('fx-cny').textContent = fxObj.cny;
+    }
+
+    async function fetchExchangeRates() {
+      try {
+        // KRW 기준 실시간 환율 조회 (1 USD, 1 JPY, 1 CNY 당 KRW 환산)
+        const res = await fetch('https://open.er-api.com/v6/latest/KRW');
+        const data = await res.json();
+        if (data && data.result === 'success' && data.rates) {
+          const usdKrw = 1 / data.rates.USD;
+          const jpy1Krw = 1 / data.rates.JPY;
+          const cnyKrw = 1 / data.rates.CNY;
+
+          const fxObj = {
+            usd: `${usdKrw.toLocaleString('ko-KR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}원`,
+            jpy: `${jpy1Krw.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}원`,
+            cny: `${cnyKrw.toLocaleString('ko-KR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}원`
+          };
+          applyFxDisplay(fxObj);
+          localStorage.setItem(FX_CACHE_KEY, JSON.stringify(fxObj));
+          return;
+        }
+        throw new Error('Primary FX failed');
+      } catch {
+        try {
+          const res2 = await fetch('https://api.frankfurter.app/latest?from=KRW&to=USD,JPY,CNY');
+          const d2 = await res2.json();
+          if (d2 && d2.rates) {
+            const fxObj = {
+              usd: `${(1 / d2.rates.USD).toLocaleString('ko-KR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}원`,
+              jpy: `${(1 / d2.rates.JPY).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}원`,
+              cny: `${(1 / d2.rates.CNY).toLocaleString('ko-KR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}원`
+            };
+            applyFxDisplay(fxObj);
+            localStorage.setItem(FX_CACHE_KEY, JSON.stringify(fxObj));
+          }
+        } catch {}
+      }
+    }
+
+    document.getElementById('fx-widget').addEventListener('click', fetchExchangeRates);
 
     /* ================= 4. 상세 보기 팝업 (일정 및 Tasks 공통) ================= */
     const detailOverlay = document.getElementById('detail-overlay');
@@ -1880,7 +2095,6 @@
       const startDate = new Date(calViewYear, calViewMonth, 1 - startOffset);
       const todayStr = formatYmd(today);
 
-      // 선택된 그룹 및 카테고리로 필터링
       let filteredCalEvents = cachedEvents;
       if (calFilterGroup !== 'ALL') {
         filteredCalEvents = filteredCalEvents.filter(ev => ev.group === calFilterGroup);
@@ -1982,7 +2196,7 @@
       renderCalendarModal();
     });
 
-    /* ================= 6. 구글 시트 연동 디데이 ================= */
+    /* ================= 6. 구글 시트 연동 디데이 (좌: 최근 D-Day / 우: 목록) ================= */
     const ddayOverlay = document.getElementById('dday-overlay');
     const ddayModalTitle = document.getElementById('dday-modal-title');
     const ddayTitleInput = document.getElementById('dday-title-input');
@@ -2026,6 +2240,12 @@
       return enriched;
     }
 
+    function formatDdayBadgeText(diffDays) {
+      if (diffDays === 0) return 'D-DAY';
+      if (diffDays > 0) return `D-${diffDays}`;
+      return `D+${Math.abs(diffDays)}`;
+    }
+
     function renderDday() {
       const countEl = document.getElementById('dday-count');
       const labelEl = document.getElementById('dday-label');
@@ -2033,8 +2253,10 @@
       const dateEl = document.getElementById('dday-target-date');
       const badgeEl = document.getElementById('dday-index-badge');
       const editBtn = document.getElementById('dday-edit-btn');
+      const listContainer = document.getElementById('dday-list-container');
 
       pastToggleBtn.classList.toggle('active', showPastDdays);
+      listContainer.innerHTML = '';
 
       const visibleList = getVisibleDdays();
 
@@ -2043,11 +2265,12 @@
         countEl.className = 'dday-count';
         groupBadgeEl.style.display = 'none';
         labelEl.textContent = selectedGroup !== 'ALL'
-          ? `${selectedGroup} D-Day 없음 (+ 버튼으로 추가)`
-          : (cachedDdays.length > 0 ? '다가오는 D-Day 없음 (지난일정 확인)' : '+ 버튼을 눌러 D-Day 추가');
+          ? `${selectedGroup} D-Day 없음`
+          : (cachedDdays.length > 0 ? '다가오는 D-Day 없음' : '+ 버튼으로 추가');
         dateEl.textContent = '--.--';
         badgeEl.textContent = '';
         editBtn.style.display = 'none';
+        listContainer.innerHTML = '<div class="empty-msg" style="margin-top: 12px; font-size: 0.78rem;">목록이 비어 있습니다.</div>';
         return;
       }
 
@@ -2055,15 +2278,9 @@
       const item = visibleList[currentDdayIndex];
 
       countEl.className = 'dday-count';
-      if (item.diffDays === 0) {
-        countEl.textContent = 'D-DAY';
-        countEl.classList.add('today');
-      } else if (item.diffDays > 0) {
-        countEl.textContent = `D-${item.diffDays}`;
-      } else {
-        countEl.textContent = `D+${Math.abs(item.diffDays)}`;
-        countEl.classList.add('past');
-      }
+      countEl.textContent = formatDdayBadgeText(item.diffDays);
+      if (item.diffDays === 0) countEl.classList.add('today');
+      else if (item.diffDays < 0) countEl.classList.add('past');
 
       const itemGroup = item.group || '개인';
       groupBadgeEl.style.display = 'inline-block';
@@ -2072,8 +2289,30 @@
 
       labelEl.textContent = item.title;
       dateEl.textContent = item.date.slice(5).replace('-', '.');
-      badgeEl.textContent = visibleList.length > 1 ? `(${currentDdayIndex + 1}/${visibleList.length})` : '';
+      badgeEl.textContent = `(${visibleList.length})`;
       editBtn.style.display = 'inline-block';
+
+      visibleList.forEach((dItem, idx) => {
+        const row = document.createElement('div');
+        row.className = 'dday-list-row' + (idx === currentDdayIndex ? ' selected' : '');
+        const grp = dItem.group || '개인';
+        const badgeCls = dItem.diffDays === 0 ? 'today' : (dItem.diffDays < 0 ? 'past' : '');
+
+        row.innerHTML = `
+          <div class="dday-list-row-left">
+            <span class="dday-group-badge ${grp === '업무' ? 'work' : ''}" style="font-size:0.62rem; padding:1px 5px;">${grp}</span>
+            <span class="dday-list-title"></span>
+          </div>
+          <span class="dday-list-badge ${badgeCls}">${formatDdayBadgeText(dItem.diffDays)}</span>
+        `;
+        row.querySelector('.dday-list-title').textContent = dItem.title;
+        row.addEventListener('click', (e) => {
+          e.stopPropagation();
+          currentDdayIndex = idx;
+          renderDday();
+        });
+        listContainer.appendChild(row);
+      });
     }
 
     pastToggleBtn.addEventListener('click', (e) => {
@@ -2081,17 +2320,6 @@
       showPastDdays = !showPastDdays;
       currentDdayIndex = 0;
       renderDday();
-    });
-
-    document.getElementById('dday-widget').addEventListener('click', (e) => {
-      if (e.target.closest('button')) return;
-      const visibleList = getVisibleDdays();
-      if (visibleList.length > 1) {
-        currentDdayIndex = (currentDdayIndex + 1) % visibleList.length;
-        renderDday();
-      } else if (visibleList.length === 0) {
-        openDdayModal(0);
-      }
     });
 
     function openDdayModal(rowToEdit) {
@@ -2433,6 +2661,11 @@
 
     function hydrateFromLocalCache() {
       try {
+        const rawFx = localStorage.getItem(FX_CACHE_KEY);
+        if (rawFx) applyFxDisplay(JSON.parse(rawFx));
+      } catch {}
+
+      try {
         const rawWeather = localStorage.getItem(WEATHER_CACHE_KEY);
         if (rawWeather) {
           const w = JSON.parse(rawWeather);
@@ -2595,12 +2828,14 @@
     if (!hasCache) renderDday();
 
     fetchWeather();
+    fetchExchangeRates();
     fetchDashboardData(false);
 
     setInterval(updateClock, 1000);
     setInterval(renderDday, 60 * 60 * 1000);
     setInterval(shiftPixels, 5 * 60 * 1000);
     setInterval(fetchWeather, 30 * 60 * 1000);
+    setInterval(fetchExchangeRates, 30 * 60 * 1000);
     setInterval(() => fetchDashboardData(false), 5 * 60 * 1000);
   </script>
 </body>
