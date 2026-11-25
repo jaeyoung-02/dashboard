@@ -178,7 +178,7 @@
       font-style: italic;
     }
 
-    /* 월간 달력 팝업 모달 (좌측 대형 달력 + 우측 상세 일정 패널) */
+    /* 월간 달력 팝업 모달 (좌측 대형 달력 + 우측 상세 일정 + 카테고리 필터) */
     #calendar-overlay { z-index: 990; padding: 10px; }
     .cal-modal {
       background: var(--card);
@@ -191,7 +191,7 @@
       max-height: 95dvh;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
     }
     .cal-header {
       display: flex;
@@ -226,6 +226,22 @@
     .cal-nav-btn:disabled {
       opacity: 0.35;
       cursor: not-allowed;
+    }
+    .cal-filter-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .cal-sub-chips {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
     }
     .cal-body {
       display: flex;
@@ -988,7 +1004,7 @@
     </div>
   </div>
 
-  <!-- 월간 달력 팝업 모달 (좌측 대형 달력 + 우측 상세 일정) -->
+  <!-- 월간 달력 팝업 모달 (좌측 대형 달력 + 우측 상세 일정 + 카테고리 지정) -->
   <div id="calendar-overlay" class="overlay hidden">
     <div class="cal-modal">
       <div class="cal-header">
@@ -999,6 +1015,15 @@
           <button type="button" class="cal-nav-btn" id="cal-today-btn">오늘</button>
         </div>
         <button type="button" class="cal-nav-btn" id="cal-close-btn">닫기 ✕</button>
+      </div>
+      <!-- 달력 팝업 내 그룹 & 카테고리 선택 바 -->
+      <div class="cal-filter-row">
+        <div class="filter-group" id="cal-group-filters">
+          <button type="button" class="filter-btn active" data-group="ALL">전체</button>
+          <button type="button" class="filter-btn" data-group="개인">개인</button>
+          <button type="button" class="filter-btn" data-group="업무">업무</button>
+        </div>
+        <div class="cal-sub-chips" id="cal-sub-category-bar"></div>
       </div>
       <div class="cal-body">
         <div class="cal-left-pane">
@@ -1174,10 +1199,12 @@
     let selectedCategory = 'ALL';
     let selectedTaskStatus = 'TODO';
 
-    // 달력 팝업 상태
+    // 달력 팝업 상태 (독립 그룹/카테고리 필터 지원)
     let calViewYear = new Date().getFullYear();
     let calViewMonth = new Date().getMonth();
     let calSelectedDateStr = '';
+    let calFilterGroup = 'ALL';
+    let calFilterCategory = 'ALL';
 
     /* ================= 0. 업무 모드 예산 현황 & 연구비 카드 팝업 ================= */
     const BUDGET_PAGE_HTML = `<!DOCTYPE html>
@@ -1782,7 +1809,7 @@
       if (e.target === detailOverlay) detailOverlay.classList.add('hidden');
     });
 
-    /* ================= 5. 월간 달력 팝업 (좌측 대형 달력 + 우측 상세 일정) ================= */
+    /* ================= 5. 월간 달력 팝업 (카테고리 지정 필터 포함) ================= */
     const calendarOverlay = document.getElementById('calendar-overlay');
 
     function formatYmd(dateObj) {
@@ -1797,8 +1824,40 @@
       calViewYear = today.getFullYear();
       calViewMonth = today.getMonth();
       calSelectedDateStr = formatYmd(today);
+      calFilterGroup = selectedGroup;
+      calFilterCategory = selectedCategory;
       renderCalendarModal();
       calendarOverlay.classList.remove('hidden');
+    }
+
+    function renderCalFilterChips() {
+      document.querySelectorAll('#cal-group-filters .filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.group === calFilterGroup);
+      });
+
+      const subBar = document.getElementById('cal-sub-category-bar');
+      subBar.innerHTML = '';
+
+      const baseEvents = calFilterGroup === 'ALL'
+        ? cachedEvents
+        : cachedEvents.filter(ev => ev.group === calFilterGroup);
+
+      const categories = ['ALL', ...new Set(baseEvents.map(ev => ev.category).filter(Boolean))];
+      if (!categories.includes(calFilterCategory)) {
+        calFilterCategory = 'ALL';
+      }
+
+      categories.forEach(cat => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'sub-chip' + (calFilterCategory === cat ? ' active' : '');
+        chip.textContent = cat === 'ALL' ? '전체 카테고리' : cat;
+        chip.addEventListener('click', () => {
+          calFilterCategory = cat;
+          renderCalendarModal();
+        });
+        subBar.appendChild(chip);
+      });
     }
 
     function renderCalendarModal() {
@@ -1811,6 +1870,8 @@
       document.getElementById('cal-prev-btn').disabled = curMonthIdx <= minMonthIdx;
       document.getElementById('cal-next-btn').disabled = curMonthIdx >= maxMonthIdx;
 
+      renderCalFilterChips();
+
       const gridEl = document.getElementById('cal-grid');
       gridEl.innerHTML = '';
 
@@ -1819,9 +1880,14 @@
       const startDate = new Date(calViewYear, calViewMonth, 1 - startOffset);
       const todayStr = formatYmd(today);
 
-      const filteredCalEvents = selectedGroup === 'ALL'
-        ? cachedEvents
-        : cachedEvents.filter(ev => ev.group === selectedGroup);
+      // 선택된 그룹 및 카테고리로 필터링
+      let filteredCalEvents = cachedEvents;
+      if (calFilterGroup !== 'ALL') {
+        filteredCalEvents = filteredCalEvents.filter(ev => ev.group === calFilterGroup);
+      }
+      if (calFilterCategory !== 'ALL') {
+        filteredCalEvents = filteredCalEvents.filter(ev => ev.category === calFilterCategory);
+      }
 
       for (let i = 0; i < 42; i++) {
         const cellDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + i);
@@ -1862,12 +1928,13 @@
 
       const detailListEl = document.getElementById('cal-day-events');
       const selectedEvents = filteredCalEvents.filter(ev => ev.dateStr === calSelectedDateStr);
+      const filterSuffix = calFilterCategory !== 'ALL' ? ` · ${calFilterCategory}` : '';
       document.getElementById('cal-selected-date-title').textContent =
-        `${calSelectedDateStr} (${selectedEvents.length}건)`;
+        `${calSelectedDateStr}${filterSuffix} (${selectedEvents.length}건)`;
 
       detailListEl.innerHTML = '';
       if (selectedEvents.length === 0) {
-        detailListEl.innerHTML = '<div class="empty-msg" style="margin-top:20px;">선택한 날짜에 일정이 없습니다.</div>';
+        detailListEl.innerHTML = '<div class="empty-msg" style="margin-top:20px;">선택한 조건의 일정이 없습니다.</div>';
       } else {
         selectedEvents.forEach(ev => {
           const row = document.createElement('div');
@@ -1882,6 +1949,14 @@
         });
       }
     }
+
+    document.querySelectorAll('#cal-group-filters .filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        calFilterGroup = btn.dataset.group;
+        calFilterCategory = 'ALL';
+        renderCalendarModal();
+      });
+    });
 
     document.getElementById('open-calendar-btn').addEventListener('click', openCalendarModal);
     document.getElementById('cal-close-btn').addEventListener('click', () => calendarOverlay.classList.add('hidden'));
@@ -2442,6 +2517,7 @@
         saveLocalDataCache();
         renderAllWidgets();
         if (!cardListOverlay.classList.contains('hidden')) renderCardList();
+        if (!calendarOverlay.classList.contains('hidden')) renderCalendarModal();
 
         document.getElementById('sync-status').textContent = 'SYNCED';
       } catch {
